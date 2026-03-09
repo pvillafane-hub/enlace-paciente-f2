@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  challenge String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  createdAt    DateTime @default(now())
+
+  documents           Document[]
+  AuditLog            AuditLog[]
+  AuthMethod          AuthMethod[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  accountActivities   AccountActivity[]
+
+  passwordChangedAt DateTime?
+}
+
+model AuthMethod {
+  id           String    @id @default(uuid())
+  userId       String
+  type         String
+  credentialId String    @unique
+  publicKey    String
+  counter      Int
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("auth_methods")
+}
+
+model Document {
+  id        String    @id @default(uuid())
+  userId    String
+  filename  String
+  filePath  String
+  docType   String
+  facility  String
+  studyDate String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  user   User        @relation(fields: [userId], references: [id])
+  shares ShareLink[] // 👈 RELACIÓN INVERSA
+}
+
+model ShareLink {
+  id         String   @id @default(uuid())
+  documentId String
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AccountActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
