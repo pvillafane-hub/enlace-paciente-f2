@@ -1,3 +1,5 @@
+"use client";
+
 import EntrarFacilButton from "@/components/EntrarFacilButton";
 
 interface Document {
@@ -60,6 +62,48 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
     return "bg-gray-100 text-gray-700";
   }
 
+  async function viewDocument(id: string) {
+
+    const res = await fetch(`/api/documents/view?id=${id}`);
+
+    if (!res.ok) {
+      alert("No se pudo abrir el documento");
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.url) {
+      window.open(data.url, "_blank");
+    }
+
+  }
+
+  async function deleteDocument(id: string) {
+
+    const confirmDelete = confirm("¿Seguro que deseas eliminar este documento?");
+
+    if (!confirmDelete) return;
+
+    const res = await fetch("/api/documents/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        documentId: id
+      })
+    });
+
+    if (!res.ok) {
+      alert("No se pudo eliminar el documento");
+      return;
+    }
+
+    location.reload();
+
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
 
@@ -90,7 +134,7 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
           </a>
         </div>
 
-        {/* 🔐 ENTRAR FÁCIL */}
+        {/* ENTRAR FACIL */}
         <div className="mt-10">
 
           {passkeyEnabled ? (
@@ -141,12 +185,12 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
 
           <div className="pt-4 flex gap-3 flex-wrap">
 
-            <a
-              href={`/dashboard/view/S${latestDocument.id}`}
+            <button
+              onClick={() => viewDocument(latestDocument.id)}
               className="bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-lg text-lg"
             >
               Ver estudio
-            </a>
+            </button>
 
             <a
               href={`/dashboard/share/${latestDocument.id}`}
@@ -154,6 +198,13 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
             >
               Enviar a mi médico
             </a>
+
+            <button
+              onClick={() => deleteDocument(latestDocument.id)}
+              className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-3 rounded-lg text-lg"
+            >
+              Eliminar
+            </button>
 
           </div>
 
@@ -231,12 +282,12 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
 
                     <div className="pt-4 flex flex-wrap gap-3">
 
-                      <a
-                        href={`/view/${doc.id}`}
+                      <button
+                        onClick={() => viewDocument(doc.id)}
                         className="bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-lg text-lg"
                       >
                         Ver estudio
-                      </a>
+                      </button>
 
                       <a
                         href={`/share/${doc.id}`}
@@ -244,6 +295,13 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
                       >
                         Enviar a mi médico
                       </a>
+
+                      <button
+                        onClick={() => deleteDocument(doc.id)}
+                        className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-3 rounded-lg text-lg"
+                      >
+                        Eliminar
+                      </button>
 
                     </div>
 

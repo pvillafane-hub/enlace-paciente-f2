@@ -13,7 +13,9 @@ export default async function handler(
   }
 
   try {
+
     // 🔐 1️⃣ Validar sesión
+
     const sessionId = req.cookies.pp_session
 
     if (!sessionId) {
@@ -21,7 +23,7 @@ export default async function handler(
     }
 
     const session = await prisma.session.findUnique({
-      where: { id: sessionId },
+      where: { id: sessionId }
     })
 
     if (!session || session.expiresAt < new Date()) {
@@ -29,6 +31,7 @@ export default async function handler(
     }
 
     // 📄 2️⃣ Obtener ID del documento
+
     let id = req.query.id
 
     if (Array.isArray(id)) {
@@ -40,28 +43,54 @@ export default async function handler(
     }
 
     // 📄 3️⃣ Buscar documento
+
     const document = await prisma.document.findUnique({
-      where: { id },
+      where: { id }
     })
 
-    if (!document || document.userId !== session.userId) {
+    if (!document) {
       return res.status(404).json({ error: "Document not found" })
     }
 
-    // ☁️ 4️⃣ Generar Signed URL
+    // 👤 4️⃣ Validar acceso
+
+    const isOwner = document.userId === session.userId
+
+    if (!isOwner) {
+
+      // verificar relación doctor-paciente
+
+      const relation = await prisma.doctorPatient.findFirst({
+        where: {
+          doctorId: session.userId,
+          patientId: document.userId
+        }
+      })
+
+      if (!relation) {
+        return res.status(403).json({ error: "Access denied" })
+      }
+
+    }
+
+    // ☁️ 5️⃣ Generar Signed URL
+
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME!,
-      Key: document.filePath, // 🔥 SOLO EL KEY
+      Key: document.filePath
     })
 
     const signedUrl = await getSignedUrl(s3, command, {
-      expiresIn: 60,
+      expiresIn: 60
     })
 
     return res.status(200).json({ url: signedUrl })
 
   } catch (error) {
+
     console.error("VIEW DOCUMENT ERROR:", error)
+
     return res.status(500).json({ error: "Internal Server Error" })
+
   }
 }

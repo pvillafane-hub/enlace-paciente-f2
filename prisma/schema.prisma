@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  PATIENT
+  DOCTOR
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Session {
   id        String   @id @default(uuid())
   userId    String
@@ -22,6 +33,7 @@ model User {
   email        String   @unique
   passwordHash String
   fullName     String
+  role         Role     @default(PATIENT)
   createdAt    DateTime @default(now())
 
   documents           Document[]
@@ -30,6 +42,15 @@ model User {
   sessions            Session[]
   passwordResetTokens PasswordResetToken[]
   accountActivities   AccountActivity[]
+
+  doctorPatients DoctorPatient[] @relation("DoctorPatients")
+  patientDoctors DoctorPatient[] @relation("PatientDoctors")
+
+  doctorRequests  MedicalAccessRequest[] @relation("DoctorRequests")
+  patientRequests MedicalAccessRequest[] @relation("PatientRequests")
+
+  doctorAlerts  MedicalAlert[] @relation("DoctorAlerts")
+  patientAlerts MedicalAlert[] @relation("PatientAlerts")
 
   passwordChangedAt DateTime?
 }
@@ -61,7 +82,7 @@ model Document {
   deletedAt DateTime?
 
   user   User        @relation(fields: [userId], references: [id])
-  shares ShareLink[] // 👈 RELACIÓN INVERSA
+  shares ShareLink[]
 }
 
 model ShareLink {
@@ -105,4 +126,39 @@ model AccountActivity {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model DoctorPatient {
+  id        String   @id @default(uuid())
+  doctorId  String
+  patientId String
+  createdAt DateTime @default(now())
+
+  doctor  User @relation("DoctorPatients", fields: [doctorId], references: [id])
+  patient User @relation("PatientDoctors", fields: [patientId], references: [id])
+
+  @@unique([doctorId, patientId])
+}
+
+model MedicalAccessRequest {
+  id        String        @id @default(uuid())
+  doctorId  String
+  patientId String
+  status    RequestStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+
+  doctor  User @relation("DoctorRequests", fields: [doctorId], references: [id])
+  patient User @relation("PatientRequests", fields: [patientId], references: [id])
+}
+
+model MedicalAlert {
+  id         String   @id @default(uuid())
+  doctorId   String
+  patientId  String
+  documentId String?
+  type       String
+  createdAt  DateTime @default(now())
+
+  doctor  User @relation("DoctorAlerts", fields: [doctorId], references: [id])
+  patient User @relation("PatientAlerts", fields: [patientId], references: [id])
 }

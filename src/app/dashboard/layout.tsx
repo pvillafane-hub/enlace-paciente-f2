@@ -6,11 +6,15 @@ import { logout } from "@/app/logout/actions"
 
 export default function DashboardLayout({
   children,
+  role = "PATIENT"
 }: {
   children: React.ReactNode
+  role?: "PATIENT" | "DOCTOR"
 }) {
 
   const [menuOpen, setMenuOpen] = useState(false)
+
+  const isDoctor = role === "DOCTOR"
 
   return (
 
@@ -24,12 +28,29 @@ export default function DashboardLayout({
 
           {/* LOGO */}
 
-          <Link
-            href="/dashboard"
-            className="text-2xl font-bold text-blue-700"
-          >
-            Enlace Salud
-          </Link>
+          <div className="flex items-center gap-3">
+
+            <Link
+              href="/dashboard"
+              className="text-2xl font-bold text-blue-700"
+            >
+              Enlace Salud
+            </Link>
+
+            {/* ROLE BADGE */}
+
+            <span
+              className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                isDoctor
+                  ? "bg-purple-100 text-purple-700"
+                  : "bg-green-100 text-green-700"
+              }`}
+            >
+              {isDoctor ? "Doctor" : "Paciente"}
+            </span>
+
+          </div>
+
 
           {/* DESKTOP MENU */}
 
@@ -39,13 +60,46 @@ export default function DashboardLayout({
               Inicio
             </Link>
 
-            <Link href="/dashboard/view" className="hover:text-blue-600">
-              Mis documentos
-            </Link>
 
-            <Link href="/dashboard/security" className="hover:text-blue-600">
-              Seguridad
-            </Link>
+            {/* PACIENTE */}
+
+            {!isDoctor && (
+              <>
+                
+                <Link href="/dashboard/doctors" className="hover:text-blue-600">
+                  Mis doctores
+                </Link>
+
+                <Link href="/dashboard/security" className="hover:text-blue-600">
+                  Seguridad
+                </Link>
+              </>
+            )}
+
+
+            {/* DOCTOR */}
+
+            {isDoctor && (
+              <>
+                <Link href="/dashboard/patients" className="hover:text-blue-600">
+                  Pacientes
+                </Link>
+
+                {/* NUEVO MÓDULO CLÍNICO */}
+
+                <Link href="/dashboard/clinic" className="hover:text-blue-600">
+                  Clínica
+                </Link>
+
+                <Link href="/dashboard/requests" className="hover:text-blue-600">
+                  Solicitudes
+                </Link>
+
+                <Link href="/dashboard/reports" className="hover:text-blue-600">
+                  Reportes
+                </Link>
+              </>
+            )}
 
             <form action={logout}>
               <button className="text-red-600 text-left">
@@ -54,6 +108,7 @@ export default function DashboardLayout({
             </form>
 
           </div>
+
 
           {/* HAMBURGER */}
 
@@ -65,6 +120,7 @@ export default function DashboardLayout({
           </button>
 
         </div>
+
 
         {/* MOBILE MENU */}
 
@@ -78,13 +134,40 @@ export default function DashboardLayout({
                 Inicio
               </Link>
 
-              <Link href="/dashboard/view" onClick={() => setMenuOpen(false)}>
-                Mis documentos
-              </Link>
+              {!isDoctor && (
+                <>
 
-              <Link href="/dashboard/security" onClick={() => setMenuOpen(false)}>
-                Seguridad
-              </Link>
+                  <Link href="/dashboard/doctors" onClick={() => setMenuOpen(false)}>
+                    Mis doctores
+                  </Link>
+
+                  <Link href="/dashboard/security" onClick={() => setMenuOpen(false)}>
+                    Seguridad
+                  </Link>
+                </>
+              )}
+
+              {isDoctor && (
+                <>
+                  <Link href="/dashboard/patients" onClick={() => setMenuOpen(false)}>
+                    Pacientes
+                  </Link>
+
+                  {/* NUEVO MÓDULO */}
+
+                  <Link href="/dashboard/clinic" onClick={() => setMenuOpen(false)}>
+                    Clínica
+                  </Link>
+
+                  <Link href="/dashboard/requests" onClick={() => setMenuOpen(false)}>
+                    Solicitudes
+                  </Link>
+
+                  <Link href="/dashboard/reports" onClick={() => setMenuOpen(false)}>
+                    Reportes
+                  </Link>
+                </>
+              )}
 
               <form action={logout}>
                 <button className="text-red-600 text-left">
@@ -100,6 +183,7 @@ export default function DashboardLayout({
 
       </nav>
 
+
       {/* CONTENT */}
 
       <main className="max-w-6xl mx-auto p-8">
@@ -107,6 +191,5 @@ export default function DashboardLayout({
       </main>
 
     </div>
-
   )
 }
