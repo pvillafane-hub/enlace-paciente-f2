@@ -62,21 +62,9 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
     return "bg-gray-100 text-gray-700";
   }
 
-  async function viewDocument(id: string) {
-
-    const res = await fetch(`/api/documents/view?id=${id}`);
-
-    if (!res.ok) {
-      alert("No se pudo abrir el documento");
-      return;
-    }
-
-    const data = await res.json();
-
-    if (data.url) {
-      window.open(data.url, "_blank");
-    }
-
+  // 🔥 FIX AQUÍ
+  function viewDocument(id: string) {
+    window.open(`/api/documents/view?id=${id}`, "_blank");
   }
 
   async function deleteDocument(id: string) {
@@ -101,7 +89,6 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
     }
 
     location.reload();
-
   }
 
   return (

@@ -1,15 +1,16 @@
 'use client'
 
-import { useFormState } from 'react-dom'
+import { useActionState } from "react"
 import { login } from './actions'
 import { useRef, useEffect, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 
 export default function LoginPage() {
-  const [state, formAction] = useFormState(login, null)
+  const [state, formAction] = useActionState(login, null)
 
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<any>(null)
 
   const [clientErrors, setClientErrors] = useState<{
     email?: string
@@ -18,15 +19,22 @@ export default function LoginPage() {
 
   const [hasPasskey, setHasPasskey] = useState(false)
   const [checkingPasskey, setCheckingPasskey] = useState(false)
-  const [debounceTimeout, setDebounceTimeout] = useState<any>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (state?.error) {
+      setIsSubmitting(false)
       setClientErrors({})
     }
   }, [state])
 
   function validateField(name: string, value: string) {
+    // limpiar error primero
+    setClientErrors(prev => ({
+      ...prev,
+      [name]: undefined,
+    }))
+
     let message = ''
 
     if (name === 'email' && !value.trim()) {
@@ -37,10 +45,12 @@ export default function LoginPage() {
       message = 'Escriba su contraseña.'
     }
 
-    setClientErrors(prev => ({
-      ...prev,
-      [name]: message || undefined,
-    }))
+    if (message) {
+      setClientErrors(prev => ({
+        ...prev,
+        [name]: message,
+      }))
+    }
   }
 
   async function checkPasskey(email: string) {
@@ -55,10 +65,17 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/has-passkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok || !data) {
+        setHasPasskey(false)
+        return
+      }
+
       setHasPasskey(data.hasPasskey)
     } catch (error) {
       console.error(error)
@@ -71,15 +88,13 @@ export default function LoginPage() {
   function handleEmailChange(value: string) {
     validateField('email', value)
 
-    if (debounceTimeout) {
-      clearTimeout(debounceTimeout)
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
     }
 
-    const timeout = setTimeout(() => {
+    debounceRef.current = setTimeout(() => {
       checkPasskey(value)
     }, 500)
-
-    setDebounceTimeout(timeout)
   }
 
   async function handlePasskeyRecovery() {
@@ -90,7 +105,9 @@ export default function LoginPage() {
       })
 
       if (!res.ok) {
-        alert('No se pudo iniciar autenticación.')
+        setClientErrors({
+          email: 'No se pudo iniciar autenticación segura.',
+        })
         return
       }
 
@@ -108,16 +125,22 @@ export default function LoginPage() {
       if (verification.ok) {
         window.location.href = '/reset-password-direct'
       } else {
-        alert('Autenticación fallida.')
+        setClientErrors({
+          email: 'Autenticación fallida. Intente nuevamente.',
+        })
       }
 
     } catch (error) {
       console.error(error)
-      alert('Error en autenticación.')
+      setClientErrors({
+        email: 'Error en autenticación. Intente nuevamente.',
+      })
     }
   }
 
   function handleClientValidation(e: React.FormEvent<HTMLFormElement>) {
+    if (isSubmitting) return
+
     const formData = new FormData(e.currentTarget)
     const email = String(formData.get('email') || '')
     const password = String(formData.get('password') || '')
@@ -143,11 +166,14 @@ export default function LoginPage() {
         passwordRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
         passwordRef.current.focus()
       }
+
+      return
     }
+
+    setIsSubmitting(true)
   }
 
-  const hasErrors =
-    state?.error || Object.values(clientErrors).some(Boolean)
+  const isEmailValid = emailRef.current?.value?.includes('@')
 
   return (
     <div className="w-full max-w-md mx-auto mt-10 md:mt-16 bg-white p-6 md:p-8 rounded-2xl shadow-lg">
@@ -220,9 +246,14 @@ export default function LoginPage() {
         {/* BOTÓN LOGIN */}
         <button
           type="submit"
-          className="w-full min-h-[56px] p-4 rounded-xl text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md active:scale-[0.99] transition"
+          disabled={isSubmitting}
+          className={`w-full min-h-[56px] p-4 rounded-xl text-xl font-semibold transition ${
+            isSubmitting
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md active:scale-[0.99]'
+          }`}
         >
-          Entrar
+          {isSubmitting ? 'Entrando...' : 'Entrar'}
         </button>
 
         {/* RECOVERY */}
@@ -238,7 +269,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          {hasPasskey && !checkingPasskey && (
+          {hasPasskey && !checkingPasskey && isEmailValid && (
             <button
               type="button"
               onClick={handlePasskeyRecovery}

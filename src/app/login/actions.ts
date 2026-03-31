@@ -5,7 +5,6 @@ import { verifyPassword, setSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { auditLog } from '@/lib/audit'
 
-
 export async function login(
   prevState: { error?: string } | null,
   formData: FormData
@@ -18,21 +17,30 @@ export async function login(
   }
 
   const user = await prisma.user.findUnique({ where: { email } })
+
   if (!user) {
     return { error: 'Email o contraseña incorrectos.' }
   }
 
+  // 🔥 NUEVO: BLOQUEO POR USUARIO INACTIVO
+  if (!user.active) {
+    return {
+      error: 'Tu cuenta ha sido desactivada. Contacta al administrador.'
+    }
+  }
+
   const ok = await verifyPassword(password, user.passwordHash)
+
   if (!ok) {
     return { error: 'Email o contraseña incorrectos.' }
   }
 
   await setSession(user.id)
+
   await auditLog({
-  userId: user.id,
-  action: 'LOGIN',
-})
+    userId: user.id,
+    action: 'LOGIN',
+  })
 
   redirect('/dashboard')
 }
-

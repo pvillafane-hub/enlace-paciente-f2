@@ -3,7 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
-export default async function PatientPage({ params }: { params: { id: string } }) {
+export default async function PatientPage({
+   params,
+   }: { 
+    params:Promise<{ id: string }> }) {
 
   const session = await getValidatedSession()
 
@@ -12,9 +15,11 @@ export default async function PatientPage({ params }: { params: { id: string } }
   }
 
   const doctorId = session.userId
-  const patientId = params.id
+  const { id: patientId } = await params
 
-  // Verificar acceso doctor → paciente
+  if (!patientId) {
+    redirect('/dashboard')
+  }
 
   const access = await prisma.doctorPatient.findFirst({
     where: {
@@ -24,14 +29,21 @@ export default async function PatientPage({ params }: { params: { id: string } }
   })
 
   if (!access) {
-    return (
-      <div className="max-w-5xl mx-auto">
-        <p className="text-red-600">
-          No tienes acceso a este paciente.
-        </p>
-      </div>
-    )
+    redirect('/dashboard')
   }
+
+  // 🔥 RESOLVER ALERTAS AUTOMÁTICAMENTE
+  await prisma.medicalAlert.updateMany({
+    where: {
+      doctorId,
+      patientId,
+      resolved: false
+    },
+    data: {
+      resolved: true,
+      resolvedAt: new Date()
+    }
+  })
 
   const patient = await prisma.user.findUnique({
     where: { id: patientId },
@@ -45,21 +57,30 @@ export default async function PatientPage({ params }: { params: { id: string } }
   })
 
   if (!patient) {
-    return (
-      <div className="max-w-5xl mx-auto">
-        <p>Paciente no encontrado</p>
-      </div>
-    )
+    redirect('/dashboard')
   }
 
+  if (!patient.active) {
+    redirect('/dashboard')
+  }
+
+  // 🔥 VACUNAS
+  const vaccines = patient.documents.filter(
+    doc => doc.docType === "Vacunas"
+  )
+
+  // 🔥 MEDICAMENTOS
+  const meds = patient.documents.filter(
+    doc => doc.docType === "Medicamentos"
+  )
+
   // ------------------------------
-  // Construir Timeline clínico
+  // Timeline
   // ------------------------------
 
   const timeline: Record<string, typeof patient.documents> = {}
 
   for (const doc of patient.documents) {
-
     const year = new Date(doc.studyDate).getFullYear().toString()
 
     if (!timeline[year]) {
@@ -75,7 +96,7 @@ export default async function PatientPage({ params }: { params: { id: string } }
 
     <div className="max-w-5xl mx-auto space-y-8">
 
-      {/* Encabezado paciente */}
+      {/* Encabezado */}
 
       <div className="bg-white rounded-xl p-6 shadow-sm border">
 
@@ -89,8 +110,113 @@ export default async function PatientPage({ params }: { params: { id: string } }
 
       </div>
 
+      {/* INFO CLÍNICA */}
 
-      {/* Historial clínico */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border">
+
+        <h2 className="text-xl font-semibold mb-4">
+          Información del paciente
+        </h2>
+
+        <div className="grid md:grid-cols-3 gap-4">
+
+          <div className="bg-blue-50 p-4 rounded-xl">
+            <p className="text-gray-500 text-sm">Fecha de nacimiento</p>
+            <p className="text-lg font-semibold">
+              {patient.dateOfBirth
+                ? new Date(patient.dateOfBirth).toLocaleDateString('es-PR')
+                : "No registrada"}
+            </p>
+          </div>
+
+          <div className="bg-red-50 p-4 rounded-xl">
+            <p className="text-gray-500 text-sm">Tipo de sangre</p>
+            <p className="text-lg font-semibold">
+              {patient.bloodType || "No registrado"}
+            </p>
+          </div>
+
+          <div className="bg-yellow-50 p-4 rounded-xl">
+            <p className="text-gray-500 text-sm">Alergias</p>
+            <p className="text-lg font-semibold">
+              {patient.allergies || "Ninguna registrada"}
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* 💉 VACUNAS */}
+
+      {vaccines.length > 0 && (
+        <div className="bg-white rounded-xl p-6 shadow-sm border">
+
+          <h2 className="text-xl font-semibold mb-4">
+            💉 Vacunas del paciente
+          </h2>
+
+          <div className="space-y-3">
+
+            {vaccines.map(v => (
+
+              <div
+                key={v.id}
+                className="flex justify-between items-center bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition"
+              >
+
+                <div>
+                  <p className="font-semibold">{v.filename}</p>
+                  <p className="text-sm text-gray-500">
+                    {v.facility}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {v.studyDate}
+                  </p>
+                </div>
+
+                <a
+                  href={`/api/documents/view?id=${v.id}`}
+                  target="_blank"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                  Ver
+                </a>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </div>
+      )}
+
+      {/* 💊 LINK DE MEDICAMENTOS */}
+
+      {meds.length > 0 && (
+        <div className="bg-white rounded-xl p-6 shadow-sm border flex justify-between items-center">
+
+          <div>
+            <p className="font-semibold text-lg">
+              💊 Medicamentos del paciente
+            </p>
+            <p className="text-sm text-gray-500">
+              {meds.length} documento(s) disponibles
+            </p>
+          </div>
+
+          <a
+            href={`/dashboard/patients/${patient.id}/medications`}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            Ver
+          </a>
+
+        </div>
+      )}
+
+      {/* HISTORIAL */}
 
       <div className="bg-white rounded-xl p-6 shadow-sm border">
 
@@ -98,15 +224,9 @@ export default async function PatientPage({ params }: { params: { id: string } }
           Historial médico
         </h2>
 
-
-        {/* 🔎 Buscador clínico */}
-
         <div className="mb-10">
           <DocumentSearch documents={patient.documents} />
         </div>
-
-
-        {/* Timeline */}
 
         {patient.documents.length === 0 && (
           <p className="text-gray-500">

@@ -11,11 +11,11 @@ async function requestAccess(formData: FormData) {
 
   if (!session) redirect('/?auth=required')
 
-  const user = await prisma.user.findUnique({
+  const doctor = await prisma.user.findUnique({
     where: { id: session.userId }
   })
 
-  if (!user || user.role !== 'DOCTOR') {
+  if (!doctor || doctor.role !== 'DOCTOR') {
     redirect('/dashboard')
   }
 
@@ -33,23 +33,37 @@ async function requestAccess(formData: FormData) {
     return
   }
 
-  // Verificar si ya existe solicitud
+  // Verificar si ya tiene acceso
 
-  const existing = await prisma.medicalAccessRequest.findFirst({
+  const alreadyAuthorized = await prisma.doctorPatient.findFirst({
     where: {
-      doctorId: user.id,
-      patientId: patient.id,
-      status: "PENDING"
+      doctorId: doctor.id,
+      patientId: patient.id
     }
   })
 
-  if (existing) return
+  if (alreadyAuthorized) {
+    return
+  }
+
+  // Verificar si ya existe solicitud
+
+  const existingRequest = await prisma.medicalAccessRequest.findFirst({
+    where: {
+      doctorId: doctor.id,
+      patientId: patient.id
+    }
+  })
+
+  if (existingRequest) {
+    return
+  }
 
   // Crear solicitud
 
   await prisma.medicalAccessRequest.create({
     data: {
-      doctorId: user.id,
+      doctorId: doctor.id,
       patientId: patient.id
     }
   })
@@ -173,19 +187,19 @@ export default async function RequestAccessPage() {
               <div className="text-sm font-semibold">
 
                 {req.status === "PENDING" && (
-                  <span className="text-yellow-600">
+                  <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">
                     Pendiente
                   </span>
                 )}
 
                 {req.status === "APPROVED" && (
-                  <span className="text-green-600">
+                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">
                     Aprobado
                   </span>
                 )}
 
                 {req.status === "REJECTED" && (
-                  <span className="text-red-600">
+                  <span className="bg-red-100 text-red-700 px-3 py-1 rounded-lg">
                     Rechazado
                   </span>
                 )}

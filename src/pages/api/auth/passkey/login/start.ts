@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { rpID } from "@/config/webauthn";
+import { prisma } from "@/lib/prisma";
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,9 +17,23 @@ export default async function handler(
       userVerification: "preferred",
     });
 
+    // 🔥 GUARDAR CHALLENGE SIN REQUERIR SESIÓN
+    // Creamos sesión temporal
+    const tempSession = await prisma.session.create({
+      data: {
+        userId: undefined, // 👈 clave
+        challenge: options.challenge,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min
+      },
+    });
+
+    const isProd = process.env.NODE_ENV === "production";
+
     res.setHeader(
       "Set-Cookie",
-      `passkey_challenge=${options.challenge}; HttpOnly; Path=/; SameSite=Lax;`
+      `pp_session=${tempSession.id}; Path=/; HttpOnly; ${
+        isProd ? "Secure;" : ""
+      } SameSite=Lax`
     );
 
     return res.status(200).json(options);

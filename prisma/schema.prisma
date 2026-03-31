@@ -7,10 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  PATIENT
-  DOCTOR
-}
 
 enum RequestStatus {
   PENDING
@@ -20,12 +16,12 @@ enum RequestStatus {
 
 model Session {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String?
   createdAt DateTime @default(now())
   expiresAt DateTime
   challenge String?
 
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model User {
@@ -34,7 +30,13 @@ model User {
   passwordHash String
   fullName     String
   role         Role     @default(PATIENT)
+  active Boolean @default(true)
   createdAt    DateTime @default(now())
+
+  // 🔥 NUEVO (AQUÍ MISMO)
+  dateOfBirth DateTime?
+  bloodType   String?
+  allergies   String?
 
   documents           Document[]
   AuditLog            AuditLog[]
@@ -146,9 +148,14 @@ model MedicalAccessRequest {
   patientId String
   status    RequestStatus @default(PENDING)
   createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   doctor  User @relation("DoctorRequests", fields: [doctorId], references: [id])
   patient User @relation("PatientRequests", fields: [patientId], references: [id])
+
+  @@unique([doctorId, patientId])
+  @@index([patientId, status])
+  @@index([doctorId, status])
 }
 
 model MedicalAlert {
@@ -159,6 +166,17 @@ model MedicalAlert {
   type       String
   createdAt  DateTime @default(now())
 
+  // 🔥 NUEVO (core feature)
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+
   doctor  User @relation("DoctorAlerts", fields: [doctorId], references: [id])
   patient User @relation("PatientAlerts", fields: [patientId], references: [id])
 }
+
+enum Role {
+  ADMIN
+  DOCTOR
+  PATIENT
+}
+

@@ -149,7 +149,7 @@ export default function UploadPage() {
         </h2>
 
         <p className="text-gray-600 text-lg mb-6">
-          Puede subir laboratorios, radiografías o recetas médicas.
+          Puede subir laboratorios, radiografías, medicamentos, vacunas o referidos médicos.
         </p>
 
         <div className="mb-8 bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-800">
@@ -268,9 +268,13 @@ export default function UploadPage() {
             >
 
               <option value="">Seleccione tipo de documento</option>
+
               <option value="Laboratorio">Laboratorio</option>
-              <option value="Radiografia">Radiografía / Imagen</option>
-              <option value="Receta">Receta médica</option>
+              <option value="Radiografia">Radiología / Imagen</option>
+              <option value="Medicamentos">Medicamentos</option>
+              <option value="Vacunas">Vacunas (ej: COVID, Influenza)</option>
+              <option value="Referidos">Referidos (orden médica)</option>
+              <option value="Implantes">Implantes (marcapasos, prótesis)</option>
               <option value="Otro">Otro documento</option>
 
             </select>

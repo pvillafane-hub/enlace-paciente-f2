@@ -18,6 +18,7 @@ export async function verifyPassword(password: string, hash: string) {
 // 🔐 CREAR SESIÓN
 
 export async function setSession(userId: string) {
+
   const session = await prisma.session.create({
     data: {
       userId,
@@ -25,7 +26,9 @@ export async function setSession(userId: string) {
     },
   })
 
-  cookies().set(SESSION_COOKIE, session.id, {
+  const cookieStore = await cookies()
+
+  cookieStore.set(SESSION_COOKIE, session.id, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -33,16 +36,22 @@ export async function setSession(userId: string) {
   })
 }
 
+
 // 🔎 OBTENER SESSION ID DESDE COOKIE
 
-export function getSessionId(): string | null {
-  return cookies().get(SESSION_COOKIE)?.value ?? null
+export async function getSessionId(): Promise<string | null> {
+
+  const cookieStore = await cookies()
+
+  return cookieStore.get(SESSION_COOKIE)?.value ?? null
 }
+
 
 // 🔎 VALIDAR SESIÓN (SIN RENOVAR)
 
 export async function getValidSession() {
-  const sessionId = getSessionId()
+
+  const sessionId = await getSessionId()
 
   if (!sessionId) return null
 
@@ -59,20 +68,25 @@ export async function getValidSession() {
   return session
 }
 
+
 // 🔄 RENOVAR SESIÓN (SLIDING SESSION)
 
 export async function refreshSession(sessionId: string) {
+
   await prisma.session.updateMany({
     where: { id: sessionId },
     data: {
       expiresAt: new Date(Date.now() + SESSION_DURATION),
     },
   })
+
 }
+
 
 // 🔐 VALIDAR + RENOVAR + INVALIDAR SI CAMBIÓ PASSWORD
 
 export async function getValidatedSession() {
+
   const session = await getValidSession()
 
   if (!session) return null
@@ -94,16 +108,23 @@ export async function getValidatedSession() {
   return session
 }
 
+
 // 🚪 LOGOUT REAL
 
 export async function clearSession() {
-  const sessionId = getSessionId()
+
+  const sessionId = await getSessionId()
 
   if (sessionId) {
+
     await prisma.session.deleteMany({
       where: { id: sessionId },
     })
+
   }
 
-  cookies().delete(SESSION_COOKIE)
+  const cookieStore = await cookies()
+
+  cookieStore.delete(SESSION_COOKIE)
+
 }

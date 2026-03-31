@@ -49,12 +49,25 @@ function MessagePage({
 export default async function SharedDocumentPage({
   params,
 }: {
-  params: { token: string }
+  params: Promise<{ token: string }>
 }) {
+
   const db = await getPrisma()
 
+  // 🔥 FIX Next 16
+  const { token } = await params
+
+  if (!token) {
+    return (
+      <MessagePage
+        title="🔐 Enlace inválido"
+        message="El enlace no contiene información válida."
+      />
+    )
+  }
+
   const share = await db.shareLink.findUnique({
-    where: { token: params.token },
+    where: { token },
     include: { document: true },
   })
 

@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { hashPassword, setSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers' // 👈 NUEVO
 
 export async function signup(
   prevState: { error?: string } | null,
@@ -48,7 +49,13 @@ export async function signup(
     },
   })
 
-  setSession(user.id)
-  redirect('/signup/success')
+  // 🔴 LIMPIAR cualquier sesión anterior (CRÍTICO)
+ const cookieStore = await cookies()
+ cookieStore.delete('pp_session')
 
+  // 🟢 CREAR sesión nueva
+  await setSession(user.id)
+
+  // 🚀 continuar flujo normal
+  redirect('/signup/success')
 }

@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 
 export default function SignupSuccessPage() {
   const router = useRouter();
-  console.log("Signup success page mounted");
+  const hasRun = useRef(false); // evita doble ejecución en dev
 
   useEffect(() => {
-    console.log("Running passkey registration...");
+    if (hasRun.current) return;
+    hasRun.current = true;
+
+    console.log("Signup success page mounted");
 
     const registerPasskey = async () => {
       try {
         console.log("🔐 Starting passkey registration...");
+
+        // ⏱️ Timeout de seguridad (10s)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
 
         // 1️⃣ Pedir opciones al backend
         const optionsRes = await fetch(
@@ -21,11 +28,19 @@ export default function SignupSuccessPage() {
           {
             method: "POST",
             credentials: "include",
+            signal: controller.signal,
           }
         );
 
+        clearTimeout(timeout);
+
+        // 🔴 Si no hay sesión → no bloquear UX
         if (!optionsRes.ok) {
-          console.error("❌ Failed to get registration options");
+          console.warn(
+            "⚠️ No session or failed to get options. Skipping passkey setup."
+          );
+
+          router.replace("/dashboard");
           return;
         }
 
@@ -48,17 +63,28 @@ export default function SignupSuccessPage() {
         );
 
         if (!verifyRes.ok) {
-          console.error("❌ Failed to verify registration");
+          console.warn("⚠️ Passkey verification failed, continuing anyway");
+          router.replace("/dashboard");
           return;
         }
 
         console.log("✅ Passkey registered successfully");
 
         // 4️⃣ Redirigir al dashboard
-        router.push("/dashboard");
+        router.replace("/dashboard");
 
-      } catch (err) {
-        console.error("🔥 Registration error:", err);
+      } catch (err: any) {
+        // 🚨 Caso usuario cancela biometría (muy común)
+        if (err?.name === "NotAllowedError") {
+          console.warn("⚠️ User cancelled passkey setup");
+        } else if (err?.name === "AbortError") {
+          console.warn("⏱️ Request timeout");
+        } else {
+          console.error("🔥 Registration error:", err);
+        }
+
+        // 👉 Nunca bloqueamos el usuario
+        router.replace("/dashboard");
       }
     };
 
