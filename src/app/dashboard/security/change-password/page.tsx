@@ -9,7 +9,8 @@ export default async function ChangePasswordPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO (page)
+  if (!session?.userId) {
     redirect('/?auth=required')
   }
 
@@ -20,6 +21,11 @@ export default async function ChangePasswordPage() {
     formData: FormData
   ) {
     'use server'
+
+    // ✅ FIX CRÍTICO (server action)
+    if (!userId) {
+      throw new Error("Unauthorized")
+    }
 
     const currentPassword = String(formData.get('currentPassword') || '')
     const newPassword = String(formData.get('newPassword') || '')

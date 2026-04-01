@@ -9,14 +9,19 @@ async function requestAccess(formData: FormData) {
 
   const session = await getValidatedSession()
 
-  if (!session) redirect('/?auth=required')
+  // ✅ FIX CRÍTICO (server action)
+  if (!session?.userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const doctorId = session.userId
 
   const doctor = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: doctorId }
   })
 
   if (!doctor || doctor.role !== 'DOCTOR') {
-    redirect('/dashboard')
+    throw new Error("Unauthorized")
   }
 
   const email = String(formData.get('email') || '')
@@ -33,37 +38,30 @@ async function requestAccess(formData: FormData) {
     return
   }
 
-  // Verificar si ya tiene acceso
-
+  // Ya tiene acceso
   const alreadyAuthorized = await prisma.doctorPatient.findFirst({
     where: {
-      doctorId: doctor.id,
+      doctorId,
       patientId: patient.id
     }
   })
 
-  if (alreadyAuthorized) {
-    return
-  }
+  if (alreadyAuthorized) return
 
-  // Verificar si ya existe solicitud
-
+  // Ya existe solicitud
   const existingRequest = await prisma.medicalAccessRequest.findFirst({
     where: {
-      doctorId: doctor.id,
+      doctorId,
       patientId: patient.id
     }
   })
 
-  if (existingRequest) {
-    return
-  }
+  if (existingRequest) return
 
   // Crear solicitud
-
   await prisma.medicalAccessRequest.create({
     data: {
-      doctorId: doctor.id,
+      doctorId,
       patientId: patient.id
     }
   })
@@ -72,12 +70,14 @@ async function requestAccess(formData: FormData) {
 }
 
 
-
 export default async function RequestAccessPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) redirect('/?auth=required')
+  // ✅ FIX CRÍTICO (page)
+  if (!session?.userId) {
+    redirect('/?auth=required')
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId }
@@ -104,7 +104,6 @@ export default async function RequestAccessPage() {
     <div className="max-w-5xl mx-auto space-y-8">
 
       {/* Header */}
-
       <div className="bg-white border rounded-xl p-6">
 
         <h1 className="text-2xl font-bold">
@@ -117,9 +116,7 @@ export default async function RequestAccessPage() {
 
       </div>
 
-
       {/* Formulario */}
-
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="font-semibold mb-4">
@@ -146,9 +143,7 @@ export default async function RequestAccessPage() {
 
       </div>
 
-
-      {/* Solicitudes enviadas */}
-
+      {/* Solicitudes */}
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="font-semibold mb-6">
@@ -156,11 +151,9 @@ export default async function RequestAccessPage() {
         </h2>
 
         {requests.length === 0 && (
-
           <p className="text-gray-500">
             No has enviado solicitudes todavía.
           </p>
-
         )}
 
         <div className="space-y-4">
@@ -173,7 +166,6 @@ export default async function RequestAccessPage() {
             >
 
               <div>
-
                 <p className="font-semibold">
                   {req.patient.fullName}
                 </p>
@@ -181,7 +173,6 @@ export default async function RequestAccessPage() {
                 <p className="text-sm text-gray-500">
                   {req.patient.email}
                 </p>
-
               </div>
 
               <div className="text-sm font-semibold">

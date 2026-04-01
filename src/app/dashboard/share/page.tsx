@@ -15,7 +15,7 @@ async function getPrisma() {
 }
 
 export default async function SharePage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const sessionId = cookieStore.get('pp_session')?.value
 
   if (!sessionId) redirect('/login')
@@ -26,13 +26,16 @@ export default async function SharePage() {
     where: { id: sessionId },
   })
 
-  if (!session || session.expiresAt < new Date()) {
+  // ✅ FIX CRÍTICO
+  if (!session || session.expiresAt < new Date() || !session.userId) {
     redirect('/login')
   }
 
+  const userId = session.userId
+
   const documents = await db.document.findMany({
     where: {
-      userId: session.userId,
+      userId: userId,
     },
     orderBy: { createdAt: 'desc' },
   })
