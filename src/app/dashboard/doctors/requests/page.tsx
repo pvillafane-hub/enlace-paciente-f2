@@ -3,6 +3,9 @@ import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
+// ==============================
+// ✅ APROBAR
+// ==============================
 
 async function approveRequest(formData: FormData) {
   'use server'
@@ -10,6 +13,10 @@ async function approveRequest(formData: FormData) {
   const session = await getValidatedSession()
 
   if (!session) redirect('/?auth=required')
+
+  if (!session.userId) {
+    redirect('/?auth=required')
+  }
 
   const requestId = String(formData.get('requestId'))
 
@@ -19,16 +26,12 @@ async function approveRequest(formData: FormData) {
 
   if (!request) return
 
-  // Crear acceso real
-
   await prisma.doctorPatient.create({
     data: {
       doctorId: request.doctorId,
       patientId: request.patientId
     }
   })
-
-  // Cambiar estado
 
   await prisma.medicalAccessRequest.update({
     where: { id: requestId },
@@ -41,12 +44,20 @@ async function approveRequest(formData: FormData) {
 }
 
 
+// ==============================
+// ❌ RECHAZAR
+// ==============================
+
 async function rejectRequest(formData: FormData) {
   'use server'
 
   const session = await getValidatedSession()
 
   if (!session) redirect('/?auth=required')
+
+  if (!session.userId) {
+    redirect('/?auth=required')
+  }
 
   const requestId = String(formData.get('requestId'))
 
@@ -61,6 +72,9 @@ async function rejectRequest(formData: FormData) {
 }
 
 
+// ==============================
+// 📄 PAGE
+// ==============================
 
 export default async function RequestsPage() {
 
@@ -68,9 +82,16 @@ export default async function RequestsPage() {
 
   if (!session) redirect('/?auth=required')
 
+  // 🔥 FIX FINAL
+  if (!session.userId) {
+    redirect('/?auth=required')
+  }
+
+  const userId = session.userId
+
   const requests = await prisma.medicalAccessRequest.findMany({
     where: {
-      patientId: session.userId,
+      patientId: userId,
       status: "PENDING"
     },
     include: {
@@ -97,7 +118,6 @@ export default async function RequestsPage() {
 
       </div>
 
-
       {requests.length === 0 && (
 
         <div className="bg-white border rounded-xl p-6">
@@ -109,7 +129,6 @@ export default async function RequestsPage() {
         </div>
 
       )}
-
 
       <div className="space-y-4">
 
@@ -132,7 +151,6 @@ export default async function RequestsPage() {
 
             </div>
 
-
             <div className="flex gap-3">
 
               <form action={approveRequest}>
@@ -143,14 +161,11 @@ export default async function RequestsPage() {
                   value={req.id}
                 />
 
-                <button
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                >
+                <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
                   Aprobar
                 </button>
 
               </form>
-
 
               <form action={rejectRequest}>
 
@@ -160,9 +175,7 @@ export default async function RequestsPage() {
                   value={req.id}
                 />
 
-                <button
-                  className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200"
-                >
+                <button className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200">
                   Rechazar
                 </button>
 
