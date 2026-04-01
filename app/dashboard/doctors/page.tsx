@@ -61,7 +61,7 @@ export default async function DoctorsPage() {
           <form
             action="/api/patient/invite-doctor"
             method="POST"
-            className="flex gap-3"
+            className="flex flex-col md:flex-row gap-3"
           >
             <input
               name="email"
