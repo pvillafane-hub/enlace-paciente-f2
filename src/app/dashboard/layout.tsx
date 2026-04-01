@@ -18,8 +18,15 @@ export default async function DashboardLayout({
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX FINAL
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const userId = session.userId
+
   const user = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: userId }
   })
 
   if (!user) {
@@ -77,11 +84,11 @@ export default async function DashboardLayout({
 
           <div className="flex items-center gap-8 text-lg">
 
-             {!isAdmin && (
-               <Link href="/dashboard">
+            {!isAdmin && (
+              <Link href="/dashboard">
                 Inicio
-               </Link>
-             )}
+              </Link>
+            )}
 
             {/* PACIENTE */}
             {!isDoctor && !isAdmin && (
@@ -113,7 +120,7 @@ export default async function DashboardLayout({
               </>
             )}
 
-            {/* ADMIN 🔥 */}
+            {/* ADMIN */}
             {isAdmin && (
               <>
                 <Link href="/dashboard/admin/users">
@@ -130,7 +137,7 @@ export default async function DashboardLayout({
               </>
             )}
 
-            {/* 🔔 CAMPANITA (solo doctor) */}
+            {/* 🔔 CAMPANITA */}
             {isDoctor && <NotificationBell alerts={alerts} />}
 
             {/* LOGOUT */}
