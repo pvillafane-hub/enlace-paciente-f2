@@ -30,7 +30,8 @@ export default async function handler(
       include: { user: { include: { AuthMethod: true } } },
     });
 
-    if (!session) {
+    // ✅ FIX CRÍTICO
+    if (!session || !session.user || !session.user.id) {
       return res.status(401).json({ error: "Invalid session" });
     }
 
@@ -52,11 +53,11 @@ export default async function handler(
       },
     });
 
-    // 🔥 Guardamos challenge en DB correctamente
+    // 🔥 Guardar challenge
     await prisma.session.update({
       where: { id: sessionId },
       data: {
-        challenge: { set: options.challenge }, // 👈 IMPORTANTE
+        challenge: { set: options.challenge },
       },
     });
 

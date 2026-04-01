@@ -33,9 +33,12 @@ export default async function handler(
       where: { id: sessionId },
     });
 
-    if (!session || !session.challenge) {
+    // ✅ FIX CRÍTICO
+    if (!session || !session.challenge || !session.userId) {
       return res.status(400).json({ error: "Missing challenge or user" });
     }
+
+    const userId = session.userId
 
     const verification = await verifyRegistrationResponse({
       response: req.body,
@@ -52,7 +55,7 @@ export default async function handler(
 
     await prisma.authMethod.create({
       data: {
-        userId: session.userId,
+        userId, // ✅ ya es string seguro
         type: "passkey",
         credentialId: credential.id,
         publicKey: Buffer.from(credential.publicKey).toString("base64"),
