@@ -20,12 +20,15 @@ export default async function handler(
       where: { id: sessionId },
     })
 
-    if (!session || session.expiresAt < new Date()) {
+    // ✅ FIX CRÍTICO
+    if (!session || session.expiresAt < new Date() || !session.userId) {
       return res.status(401).json({ error: 'Invalid session' })
     }
 
+    const userId = session.userId
+
     const documents = await prisma.document.findMany({
-      where: { userId: session.userId },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
