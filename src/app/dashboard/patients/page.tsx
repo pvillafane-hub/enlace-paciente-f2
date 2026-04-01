@@ -7,7 +7,8 @@ export default async function PatientsPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
     redirect('/?auth=required')
   }
 
@@ -68,7 +69,7 @@ export default async function PatientsPage() {
             action: "HIGH_RISK_PATIENT",
             userId: p.patient.id,
             createdAt: {
-              gte: new Date(Date.now() - 60 * 60 * 1000) // 1 hora
+              gte: new Date(Date.now() - 60 * 60 * 1000)
             }
           }
         })
