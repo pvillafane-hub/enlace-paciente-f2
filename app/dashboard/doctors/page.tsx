@@ -68,10 +68,10 @@ export default async function DoctorsPage() {
               type="email"
               placeholder="Email del doctor"
               required
-              className="flex-1 border rounded-lg px-3 py-2"
+              className="flex-1 border rounded-lg px-3 py-3"
             />
 
-            <button className="bg-blue-600 text-white px-4 rounded-lg">
+            <button className="bg-blue-600 text-white px-4 py-3 rounded-lg w-full md:w-auto">
               Autorizar
             </button>
           </form>
