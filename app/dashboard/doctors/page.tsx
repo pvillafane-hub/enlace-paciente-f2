@@ -10,12 +10,7 @@ export default async function DoctorsPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
-    redirect("/?auth=required")
-  }
-
-  // 🔥 FIX CRÍTICO
-  if (!session.userId) {
+  if (!session || !session.userId) {
     redirect("/?auth=required")
   }
 
@@ -109,32 +104,34 @@ export default async function DoctorsPage() {
 
           <div className="space-y-4">
 
-            {requests.map(r => (
+            {requests.map(r => {
+              if (!r.doctor) return null
 
-              <div
-                key={r.id}
-                className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex justify-between items-center"
-              >
-
-                <div>
-                  <p className="font-semibold">
-                    {r.doctor.fullName}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {r.doctor.email}
-                  </p>
-                </div>
-
-                <Link
-                  href="/dashboard/doctors/requests"
-                  className="text-sm bg-green-600 text-white px-3 py-1 rounded"
+              return (
+                <div
+                  key={r.id}
+                  className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex justify-between items-center"
                 >
-                  Revisar
-                </Link>
 
-              </div>
+                  <div>
+                    <p className="font-semibold">
+                      {r.doctor.fullName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {r.doctor.email}
+                    </p>
+                  </div>
 
-            ))}
+                  <Link
+                    href="/dashboard/doctors/requests"
+                    className="text-sm bg-green-600 text-white px-3 py-1 rounded"
+                  >
+                    Revisar
+                  </Link>
+
+                </div>
+              )
+            })}
 
           </div>
 
@@ -155,36 +152,35 @@ export default async function DoctorsPage() {
 
           <div className="space-y-4">
 
-            {doctors.map(d => (
+            {doctors.map(d => {
+              if (!d.doctor) return null
 
-              <div
-                key={d.doctor.id}
-                className="bg-white border rounded-xl p-4 flex justify-between items-center"
-              >
-
-                <div>
-                  <p className="font-semibold">
-                    {d.doctor.fullName}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {d.doctor.email}
-                  </p>
-                </div>
-
-                {/* 🔥 FIX FINAL SERVER ACTION */}
-                <form
-                  action={async (formData: FormData) => {
-                    await revokeAccess(d.doctor.id)
-                  }}
+              return (
+                <div
+                  key={d.doctor.id}
+                  className="bg-white border rounded-xl p-4 flex justify-between items-center"
                 >
-                  <button className="text-red-600 text-sm">
-                    Revocar acceso
-                  </button>
-                </form>
 
-              </div>
+                  <div>
+                    <p className="font-semibold">
+                      {d.doctor.fullName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {d.doctor.email}
+                    </p>
+                  </div>
 
-            ))}
+                  {/* ✅ SERVER ACTION CORRECTA */}
+                  <form action={revokeAccess}>
+                    <input type="hidden" name="doctorId" value={d.doctor.id} />
+                    <button className="text-red-600 text-sm">
+                      Revocar acceso
+                    </button>
+                  </form>
+
+                </div>
+              )
+            })}
 
           </div>
 
