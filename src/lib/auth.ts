@@ -65,6 +65,11 @@ export async function getValidSession() {
     return null
   }
 
+  // ✅ FIX CLAVE: asegurar userId válido
+  if (!session.userId) {
+    return null
+  }
+
   return session
 }
 
@@ -85,11 +90,19 @@ export async function refreshSession(sessionId: string) {
 
 // 🔐 VALIDAR + RENOVAR + INVALIDAR SI CAMBIÓ PASSWORD
 
-export async function getValidatedSession() {
+export async function getValidatedSession(): Promise<{
+  id: string
+  userId: string
+  createdAt: Date
+  expiresAt: Date
+} | null> {
 
   const session = await getValidSession()
 
   if (!session) return null
+
+  // ✅ SEGURIDAD: aquí ya garantizamos string
+  if (!session.userId) return null
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
@@ -105,7 +118,13 @@ export async function getValidatedSession() {
   // 🔄 Sliding renewal
   await refreshSession(session.id)
 
-  return session
+  // ✅ RETURN TIPADO SEGURO
+  return {
+    id: session.id,
+    userId: session.userId,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+  }
 }
 
 
