@@ -7,7 +7,8 @@ export default async function ProfilePage() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
     redirect("/?auth=required")
   }
 
