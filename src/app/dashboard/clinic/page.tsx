@@ -11,6 +11,11 @@ export default async function ClinicPage() {
     redirect('/?auth=required')
   }
 
+  // 🔥 FIX CRÍTICO FINAL
+  if (!session.userId) {
+    redirect('/?auth=required')
+  }
+
   const doctorId = session.userId
 
   const patients = await prisma.doctorPatient.findMany({
