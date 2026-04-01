@@ -19,8 +19,15 @@ export default async function AdminLogsPage({
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const userId = session.userId
+
   const user = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: userId }
   })
 
   if (!user || user.role !== Role.ADMIN) {
