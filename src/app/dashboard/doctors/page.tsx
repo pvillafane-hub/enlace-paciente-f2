@@ -14,8 +14,15 @@ export default async function DoctorsPage() {
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const userId = session.userId
+
   const user = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: userId }
   })
 
   if (!user) {
@@ -30,13 +37,13 @@ export default async function DoctorsPage() {
   if (!isDoctor) {
 
     const doctors = await prisma.doctorPatient.findMany({
-      where: { patientId: user.id },
+      where: { patientId: userId },
       include: { doctor: true }
     })
 
     const requests = await prisma.medicalAccessRequest.findMany({
       where: {
-        patientId: user.id,
+        patientId: userId,
         status: "PENDING"
       },
       include: { doctor: true }
@@ -49,7 +56,7 @@ export default async function DoctorsPage() {
           Gestión de acceso médico
         </h1>
 
-        {/* ➕ AUTORIZAR DOCTOR */}
+        {/* ➕ AUTORIZAR */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
 
           <h2 className="font-semibold mb-3">
@@ -133,7 +140,7 @@ export default async function DoctorsPage() {
 
         </div>
 
-        {/* 🧑‍⚕️ DOCTORES */}
+        {/* 👨‍⚕️ DOCTORES */}
         <div>
 
           <h2 className="text-xl font-semibold mb-4">
@@ -164,7 +171,12 @@ export default async function DoctorsPage() {
                   </p>
                 </div>
 
-                <form action={revokeAccess.bind(null, d.doctor.id)}>
+                {/* 🔥 FIX FINAL SERVER ACTION */}
+                <form
+                  action={async (formData: FormData) => {
+                    await revokeAccess(d.doctor.id)
+                  }}
+                >
                   <button className="text-red-600 text-sm">
                     Revocar acceso
                   </button>
@@ -188,7 +200,7 @@ export default async function DoctorsPage() {
 
   const patientsData = await prisma.doctorPatient.findMany({
     where: {
-      doctorId: user.id
+      doctorId: userId
     },
     include: {
       patient: {
@@ -241,32 +253,17 @@ export default async function DoctorsPage() {
         </p>
       </div>
 
-      {/* 🔥 MÉTRICAS */}
-
       <div className="grid md:grid-cols-3 gap-6">
 
-        <StatCard
-          title="Pacientes en sistema"
-          value={patientsData.length}
-        />
-
-        <StatCard
-          title="Pacientes activos"
-          value={activeCount}
-        />
-
-        <StatCard
-          title="Requieren seguimiento"
-          value={inactiveCount}
-        />
+        <StatCard title="Pacientes en sistema" value={patientsData.length} />
+        <StatCard title="Pacientes activos" value={activeCount} />
+        <StatCard title="Requieren seguimiento" value={inactiveCount} />
 
       </div>
 
     </div>
   )
 }
-
-// 🔧 COMPONENTE
 
 function StatCard({
   title,
