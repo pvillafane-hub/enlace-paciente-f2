@@ -8,9 +8,12 @@ export async function sendRequest(email: string) {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO (server action)
+  if (!session?.userId) {
     throw new Error("Unauthorized")
   }
+
+  const doctorId = session.userId
 
   const patient = await prisma.user.findUnique({
     where: { email }
@@ -24,7 +27,7 @@ export async function sendRequest(email: string) {
   await prisma.medicalAccessRequest.upsert({
     where: {
       doctorId_patientId: {
-        doctorId: session.userId,
+        doctorId,
         patientId: patient.id
       }
     },
@@ -32,7 +35,7 @@ export async function sendRequest(email: string) {
       status: "PENDING"
     },
     create: {
-      doctorId: session.userId,
+      doctorId,
       patientId: patient.id
     }
   })
