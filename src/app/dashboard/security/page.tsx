@@ -8,7 +8,8 @@ export default async function SecurityPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
     redirect('/?auth=required')
   }
 
