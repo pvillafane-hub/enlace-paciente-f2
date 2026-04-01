@@ -17,6 +17,11 @@ export default async function AlertsPage() {
     redirect('/?auth=required')
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect('/?auth=required')
+  }
+
   const doctorId = session.userId
 
   const alerts: AlertWithPatient[] = await prisma.medicalAlert.findMany({
@@ -75,7 +80,6 @@ export default async function AlertsPage() {
                 🔴 {alert.patient.fullName}
               </Link>
 
-              {/* 🔥 BOTÓN */}
               <form action={resolveAlert.bind(null, alert.id)}>
                 <button className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
                   Resolver
