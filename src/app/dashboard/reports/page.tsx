@@ -8,7 +8,10 @@ export default async function ReportsPage() {
 
   const session = await getValidatedSession()
 
-  if (!session) redirect("/?auth=required")
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
+    redirect("/?auth=required")
+  }
 
   const doctor = await prisma.user.findUnique({
     where: { id: session.userId }
@@ -61,7 +64,7 @@ export default async function ReportsPage() {
     }
   })
 
-  // 🔥 NUEVO: ACTIVIDAD POR PACIENTE
+  // 🔥 ACTIVIDAD POR PACIENTE
   const activity = await prisma.document.groupBy({
     by: ["userId"],
     where: {
@@ -77,7 +80,6 @@ export default async function ReportsPage() {
   )
 
   const now = Date.now()
-  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
   const inactivePatients = patients.map(p => {
 
@@ -128,7 +130,7 @@ export default async function ReportsPage() {
 
       </div>
 
-      {/* 🔴 NUEVO: INACTIVOS */}
+      {/* 🔴 INACTIVOS */}
 
       <div className="bg-white border rounded-xl p-6">
 
