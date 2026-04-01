@@ -1,12 +1,10 @@
 "use client";
 
-export const dynamic = "force-dynamic"; // ✅ FIX CLAVE
-
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import EntrarFacilLoginButton from "@/components/EntrarFacilLoginButton";
 
-export default function LandingPage() {
+export default function LandingClient() {
   const searchParams = useSearchParams();
   const authRequired = searchParams?.get("auth");
 
