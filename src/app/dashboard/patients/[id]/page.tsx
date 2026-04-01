@@ -4,13 +4,15 @@ import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 export default async function PatientPage({
-   params,
-   }: { 
-    params:Promise<{ id: string }> }) {
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
     redirect('/?auth=required')
   }
 
@@ -97,9 +99,7 @@ export default async function PatientPage({
     <div className="max-w-5xl mx-auto space-y-8">
 
       {/* Encabezado */}
-
       <div className="bg-white rounded-xl p-6 shadow-sm border">
-
         <h1 className="text-3xl font-bold">
           {patient.fullName}
         </h1>
@@ -107,13 +107,10 @@ export default async function PatientPage({
         <p className="text-gray-500 mt-2">
           {patient.email}
         </p>
-
       </div>
 
       {/* INFO CLÍNICA */}
-
       <div className="bg-white rounded-xl p-6 shadow-sm border">
-
         <h2 className="text-xl font-semibold mb-4">
           Información del paciente
         </h2>
@@ -144,11 +141,9 @@ export default async function PatientPage({
           </div>
 
         </div>
-
       </div>
 
       {/* 💉 VACUNAS */}
-
       {vaccines.length > 0 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border">
 
@@ -159,12 +154,10 @@ export default async function PatientPage({
           <div className="space-y-3">
 
             {vaccines.map(v => (
-
               <div
                 key={v.id}
                 className="flex justify-between items-center bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition"
               >
-
                 <div>
                   <p className="font-semibold">{v.filename}</p>
                   <p className="text-sm text-gray-500">
@@ -184,16 +177,13 @@ export default async function PatientPage({
                 </a>
 
               </div>
-
             ))}
 
           </div>
-
         </div>
       )}
 
-      {/* 💊 LINK DE MEDICAMENTOS */}
-
+      {/* 💊 MEDICAMENTOS */}
       {meds.length > 0 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border flex justify-between items-center">
 
@@ -217,7 +207,6 @@ export default async function PatientPage({
       )}
 
       {/* HISTORIAL */}
-
       <div className="bg-white rounded-xl p-6 shadow-sm border">
 
         <h2 className="text-xl font-semibold mb-6">
@@ -254,7 +243,6 @@ export default async function PatientPage({
                   >
 
                     <div>
-
                       <p className="font-semibold">
                         {doc.filename}
                       </p>
@@ -266,7 +254,6 @@ export default async function PatientPage({
                       <p className="text-xs text-gray-400">
                         {doc.studyDate}
                       </p>
-
                     </div>
 
                     <a
