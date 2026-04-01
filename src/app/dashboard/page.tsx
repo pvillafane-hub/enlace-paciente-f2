@@ -10,7 +10,8 @@ export default async function Dashboard() {
 
   const session = await getValidatedSession()
 
-  if (!session) {
+  // ✅ FIX AQUÍ
+  if (!session?.userId) {
     redirect("/?auth=required")
   }
 
@@ -68,7 +69,7 @@ export default async function Dashboard() {
 
       // 🔥 FIX REAL
       if (!docs || docs.length === 0) {
-        score = 0 // 🟢 NO es problema
+        score = 0
       } else {
 
         let latestDoc = docs[0]
