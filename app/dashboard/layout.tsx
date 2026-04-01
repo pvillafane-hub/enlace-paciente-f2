@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { logout } from "@/app/logout/actions"
+import { logout } from "app/logout/actions"
 import { Role } from "@prisma/client"
 
 export default async function DashboardLayout({

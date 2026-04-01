@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import PatientClinicalForm from "@/app/dashboard/profile/PatientClinicalForm"
+import PatientClinicalForm from "app/dashboard/profile/PatientClinicalForm"
 
 export default async function ProfilePage() {
 

@@ -2,7 +2,7 @@ import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { Role } from "@prisma/client"
-import { toggleUserActive, changeUserRole } from "@/app/dashboard/admin/users/actions"
+import { toggleUserActive, changeUserRole } from "app/dashboard/admin/users/actions"
 
 export default async function AdminUsersPage({
   searchParams,
