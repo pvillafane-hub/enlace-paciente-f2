@@ -4,69 +4,75 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
 // ==============================
-// ✅ APROBAR
+// 🔐 SERVER ACTION
 // ==============================
 
-async function approveRequest(formData: FormData) {
+async function requestAccess(formData: FormData) {
   'use server'
 
   const session = await getValidatedSession()
 
   if (!session?.userId) {
-    redirect('/?auth=required')
+    throw new Error("Unauthorized")
   }
 
-  const requestId = String(formData.get('requestId'))
+  const doctorId = session.userId
 
-  const request = await prisma.medicalAccessRequest.findUnique({
-    where: { id: requestId }
+  const doctor = await prisma.user.findUnique({
+    where: { id: doctorId }
   })
 
-  if (!request) return
+  if (!doctor || doctor.role !== 'DOCTOR') {
+    throw new Error("Unauthorized")
+  }
 
-  await prisma.doctorPatient.create({
-    data: {
-      doctorId: request.doctorId,
-      patientId: request.patientId
+  const email = String(formData.get('email') || '')
+    .toLowerCase()
+    .trim()
+
+  if (!email) return
+
+  const patient = await prisma.user.findUnique({
+    where: { email }
+  })
+
+  if (!patient || patient.role !== 'PATIENT') {
+    return
+  }
+
+  const alreadyAuthorized = await prisma.doctorPatient.findFirst({
+    where: {
+      doctorId,
+      patientId: patient.id
     }
   })
 
-  await prisma.medicalAccessRequest.update({
-    where: { id: requestId },
-    data: { status: "APPROVED" }
+  if (alreadyAuthorized) return
+
+  const existingRequest = await prisma.medicalAccessRequest.findFirst({
+    where: {
+      doctorId,
+      patientId: patient.id
+    }
   })
 
-  revalidatePath('/dashboard/doctors/requests')
-}
+  if (existingRequest) return
 
-// ==============================
-// ❌ RECHAZAR
-// ==============================
-
-async function rejectRequest(formData: FormData) {
-  'use server'
-
-  const session = await getValidatedSession()
-
-  if (!session?.userId) {
-    redirect('/?auth=required')
-  }
-
-  const requestId = String(formData.get('requestId'))
-
-  await prisma.medicalAccessRequest.update({
-    where: { id: requestId },
-    data: { status: "REJECTED" }
+  await prisma.medicalAccessRequest.create({
+    data: {
+      doctorId,
+      patientId: patient.id
+    }
   })
 
-  revalidatePath('/dashboard/doctors/requests')
+  revalidatePath('/dashboard/request-access')
 }
 
 // ==============================
 // 📄 PAGE
 // ==============================
 
-export default async function RequestsPage() {
+export default async function RequestAccessPage() {
 
   const session = await getValidatedSession()
 
@@ -74,15 +80,20 @@ export default async function RequestsPage() {
     redirect('/?auth=required')
   }
 
-  const userId = session.userId
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId }
+  })
+
+  if (!user || user.role !== 'DOCTOR') {
+    redirect('/dashboard')
+  }
 
   const requests = await prisma.medicalAccessRequest.findMany({
     where: {
-      patientId: userId,
-      status: "PENDING"
+      doctorId: user.id
     },
     include: {
-      doctor: true
+      patient: true
     },
     orderBy: {
       createdAt: 'desc'
@@ -96,75 +107,102 @@ export default async function RequestsPage() {
       {/* HEADER */}
       <div className="bg-white border rounded-xl p-6">
         <h1 className="text-2xl font-bold">
-          Solicitudes médicas
+          Solicitar acceso a paciente
         </h1>
 
         <p className="text-gray-500 mt-2">
-          Doctores que desean acceso a tus documentos
+          Busca un paciente por su email para solicitar acceso a sus documentos médicos.
         </p>
       </div>
 
-      {/* EMPTY */}
-      {requests.length === 0 && (
-        <div className="bg-white border rounded-xl p-6">
-          <p className="text-gray-500">
-            No tienes solicitudes pendientes.
-          </p>
-        </div>
-      )}
+      {/* FORMULARIO */}
+      <div className="bg-white border rounded-xl p-6">
+
+        <h2 className="font-semibold mb-4">
+          Nueva solicitud
+        </h2>
+
+        <form action={requestAccess} className="flex flex-col md:flex-row gap-3">
+
+          <input
+            name="email"
+            type="email"
+            placeholder="Email del paciente"
+            required
+            className="border rounded-lg px-4 py-3 flex-1"
+          />
+
+          <button
+            className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 w-full md:w-auto"
+          >
+            Solicitar acceso
+          </button>
+
+        </form>
+
+      </div>
 
       {/* LISTA */}
-      <div className="space-y-4">
+      <div className="bg-white border rounded-xl p-6">
 
-        {requests.map((req) => {
+        <h2 className="font-semibold mb-6">
+          Solicitudes enviadas
+        </h2>
 
-          if (!req.doctor) return null
+        {requests.length === 0 && (
+          <p className="text-gray-500">
+            No has enviado solicitudes todavía.
+          </p>
+        )}
 
-          return (
+        <div className="space-y-4">
+
+          {requests.map((req: any) => (
 
             <div
               key={req.id}
-              className="bg-white border rounded-xl p-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4"
+              className="border rounded-lg p-4 flex justify-between items-start md:items-center gap-4"
             >
 
               {/* INFO */}
               <div>
-                <p className="font-semibold text-lg">
-                  {req.doctor.fullName}
+                <p className="font-semibold">
+                  {req.patient.fullName}
                 </p>
 
-                <p className="text-gray-500">
-                  {req.doctor.email}
+                <p className="text-sm text-gray-500">
+                  {req.patient.email}
                 </p>
               </div>
 
-              {/* BOTONES */}
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              {/* STATUS */}
+              <div className="text-sm font-semibold flex-shrink-0">
 
-                {/* APROBAR */}
-                <form action={approveRequest} className="w-full sm:w-auto">
-                  <input type="hidden" name="requestId" value={req.id} />
+                {req.status === "PENDING" && (
+                  <span className="bg-yellow-100 text-yellow-700 px-3 py-2 rounded-lg inline-block">
+                    Pendiente
+                  </span>
+                )}
 
-                  <button className="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 w-full sm:w-auto">
-                    Aprobar
-                  </button>
-                </form>
+                {req.status === "APPROVED" && (
+                  <span className="bg-green-100 text-green-700 px-3 py-2 rounded-lg inline-block">
+                    Aprobado
+                  </span>
+                )}
 
-                {/* RECHAZAR */}
-                <form action={rejectRequest} className="w-full sm:w-auto">
-                  <input type="hidden" name="requestId" value={req.id} />
-
-                  <button className="bg-red-100 text-red-700 px-4 py-3 rounded-lg hover:bg-red-200 w-full sm:w-auto">
-                    Rechazar
-                  </button>
-                </form>
+                {req.status === "REJECTED" && (
+                  <span className="bg-red-100 text-red-700 px-3 py-2 rounded-lg inline-block">
+                    Rechazado
+                  </span>
+                )}
 
               </div>
 
             </div>
 
-          )
-        })}
+          ))}
+
+        </div>
 
       </div>
 
