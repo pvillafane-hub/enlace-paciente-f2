@@ -1,162 +1,124 @@
-import NotificationBell from "@/components/NotificationBell"
-import { prisma } from "@/lib/prisma"
-import { getValidatedSession } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import Link from "next/link"
-import { logout } from "app/logout/actions"
-import { Role } from "@prisma/client"
+"use client";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+import { useState } from "react";
+import Link from "next/link";
 
-  const session = await getValidatedSession()
+export default function DashboardNav({
+  isDoctor,
+  isAdmin,
+  alerts,
+  NotificationBell,
+  logout,
+}: any) {
 
-  if (!session) {
-    redirect("/?auth=required")
-  }
-
-  // 🔥 FIX FINAL
-  if (!session.userId) {
-    redirect("/?auth=required")
-  }
-
-  const userId = session.userId
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId }
-  })
-
-  if (!user) {
-    redirect("/")
-  }
-
-  const isDoctor = user.role === Role.DOCTOR
-  const isAdmin = user.role === Role.ADMIN
-
-  // 🔔 ALERTAS (solo doctor)
-  let alerts: {
-    id: string
-    type: string
-    patientName: string
-    patientId: string
-  }[] = []
-
-  if (isDoctor) {
-    const alertsData = await prisma.medicalAlert.findMany({
-      where: {
-        doctorId: user.id,
-        resolved: false
-      },
-      include: {
-        patient: true
-      },
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 5
-    })
-
-    alerts = alertsData.map(a => ({
-      id: a.id,
-      type: a.type,
-      patientName: a.patient.fullName,
-      patientId: a.patient.id
-    }))
-  }
+  const [open, setOpen] = useState(false);
 
   return (
+    <nav className="bg-white border-b">
 
-    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
 
-      <nav className="bg-white border-b">
+        <Link
+          href="/dashboard"
+          className="text-2xl font-bold text-blue-700"
+        >
+          Enlace Salud
+        </Link>
 
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        {/* 🔥 DESKTOP */}
+        <div className="hidden md:flex items-center gap-8 text-lg">
 
-          <Link
-            href="/dashboard"
-            className="text-2xl font-bold text-blue-700"
-          >
-            Enlace Salud
-          </Link>
+          {!isAdmin && <Link href="/dashboard">Inicio</Link>}
 
-          <div className="flex items-center gap-8 text-lg">
+          {!isDoctor && !isAdmin && (
+            <>
+              <Link href="/dashboard/doctors">Mis doctores</Link>
+              <Link href="/dashboard/security">Seguridad</Link>
+            </>
+          )}
 
-            {!isAdmin && (
-              <Link href="/dashboard">
-                Inicio
-              </Link>
-            )}
+          {isDoctor && (
+            <>
+              <Link href="/dashboard/patients">Pacientes</Link>
+              <Link href="/dashboard/requests">Solicitudes</Link>
+              <Link href="/dashboard/reports">Reportes</Link>
+            </>
+          )}
 
-            {/* PACIENTE */}
-            {!isDoctor && !isAdmin && (
-              <>
-                <Link href="/dashboard/doctors">
-                  Mis doctores
-                </Link>
+          {isAdmin && (
+            <>
+              <Link href="/dashboard/admin/users">Usuarios</Link>
+              <Link href="/dashboard/admin/logs">Logs</Link>
+              <Link href="/dashboard/admin/alerts">Alertas</Link>
+            </>
+          )}
 
-                <Link href="/dashboard/security">
-                  Seguridad
-                </Link>
-              </>
-            )}
+          {isDoctor && <NotificationBell alerts={alerts} />}
 
-            {/* DOCTOR */}
-            {isDoctor && (
-              <>
-                <Link href="/dashboard/patients">
-                  Pacientes
-                </Link>
-
-                <Link href="/dashboard/requests">
-                  Solicitudes
-                </Link>
-
-                <Link href="/dashboard/reports">
-                  Reportes
-                </Link>
-              </>
-            )}
-
-            {/* ADMIN */}
-            {isAdmin && (
-              <>
-                <Link href="/dashboard/admin/users">
-                  Usuarios
-                </Link>
-
-                <Link href="/dashboard/admin/logs">
-                  Logs
-                </Link>
-
-                <Link href="/dashboard/admin/alerts">
-                  Alertas
-                </Link>
-              </>
-            )}
-
-            {/* 🔔 CAMPANITA */}
-            {isDoctor && <NotificationBell alerts={alerts} />}
-
-            {/* LOGOUT */}
-            <form action={logout}>
-              <button className="text-red-600">
-                Salir
-              </button>
-            </form>
-
-          </div>
+          <form action={logout}>
+            <button className="text-red-600">Salir</button>
+          </form>
 
         </div>
 
-      </nav>
+        {/* 🔥 MOBILE BUTTON */}
+        <button
+          onClick={() => setOpen(true)}
+          className="md:hidden text-2xl"
+        >
+          ☰
+        </button>
 
-      <main className="max-w-6xl mx-auto p-8">
-        {children}
-      </main>
+      </div>
 
-    </div>
-  )
+      {/* 🔥 MOBILE MENU */}
+      {open && (
+        <div className="fixed inset-0 bg-black/40 z-50">
+
+          <div className="bg-white w-64 h-full p-6 flex flex-col gap-6">
+
+            <button
+              onClick={() => setOpen(false)}
+              className="self-end text-xl"
+            >
+              ✕
+            </button>
+
+            {!isAdmin && <Link href="/dashboard" onClick={() => setOpen(false)}>Inicio</Link>}
+
+            {!isDoctor && !isAdmin && (
+              <>
+                <Link href="/dashboard/doctors" onClick={() => setOpen(false)}>Mis doctores</Link>
+                <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>
+              </>
+            )}
+
+            {isDoctor && (
+              <>
+                <Link href="/dashboard/patients" onClick={() => setOpen(false)}>Pacientes</Link>
+                <Link href="/dashboard/requests" onClick={() => setOpen(false)}>Solicitudes</Link>
+                <Link href="/dashboard/reports" onClick={() => setOpen(false)}>Reportes</Link>
+              </>
+            )}
+
+            {isAdmin && (
+              <>
+                <Link href="/dashboard/admin/users" onClick={() => setOpen(false)}>Usuarios</Link>
+                <Link href="/dashboard/admin/logs" onClick={() => setOpen(false)}>Logs</Link>
+                <Link href="/dashboard/admin/alerts" onClick={() => setOpen(false)}>Alertas</Link>
+              </>
+            )}
+
+            {isDoctor && <NotificationBell alerts={alerts} />}
+
+            <form action={logout}>
+              <button className="text-red-600">Salir</button>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+    </nav>
+  );
 }
