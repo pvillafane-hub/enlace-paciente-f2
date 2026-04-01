@@ -15,8 +15,15 @@ export async function toggleUserActive(userId: string) {
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const adminId = session.userId
+
   const admin = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: adminId }
   })
 
   if (!admin || admin.role !== Role.ADMIN) {
@@ -57,8 +64,15 @@ export async function changeUserRole(
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const adminId = session.userId
+
   const admin = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: adminId }
   })
 
   if (!admin || admin.role !== Role.ADMIN) {
