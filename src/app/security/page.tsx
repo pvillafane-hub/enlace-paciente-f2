@@ -6,14 +6,16 @@ import { prisma } from '@/lib/prisma'
 export default async function SecurityPage() {
   const session = await getValidatedSession()
 
-  // 🔐 Si no hay sesión válida, redirigir
-  if (!session) {
+  // ✅ FIX CRÍTICO
+  if (!session?.userId) {
     redirect('/?auth=required')
   }
-  const passkey = await prisma.authMethod.findFirst({
-    where: { userId: session.userId }
-  })
+
   const userId = session.userId
+
+  const passkey = await prisma.authMethod.findFirst({
+    where: { userId }
+  })
 
   return (
     <div className="max-w-2xl">
