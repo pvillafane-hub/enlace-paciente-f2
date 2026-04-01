@@ -27,8 +27,15 @@ export default async function AdminAlertsPage() {
     redirect("/?auth=required")
   }
 
+  // 🔥 FIX CRÍTICO
+  if (!session.userId) {
+    redirect("/?auth=required")
+  }
+
+  const userId = session.userId
+
   const user = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: userId }
   })
 
   if (!user || user.role !== Role.ADMIN) {
@@ -52,10 +59,6 @@ export default async function AdminAlertsPage() {
     }
   })
 
-  // =============================
-  // 🧠 ACTIVIDAD SOSPECHOSA
-  // =============================
-
   const activityMap: Record<string, number> = {}
 
   for (const log of logs) {
@@ -71,10 +74,6 @@ export default async function AdminAlertsPage() {
       count
     }))
 
-  // =============================
-  // 🚨 ALERTAS DE RIESGO
-  // =============================
-
   const riskAlerts: RiskAlert[] = logs
     .filter(log => log.action === "HIGH_RISK_PATIENT")
     .map(log => ({
@@ -84,13 +83,8 @@ export default async function AdminAlertsPage() {
       reason: (log.metadata as any)?.reason ?? "Riesgo alto"
     }))
 
-  // =============================
-  // 🔥 COMBINAR + ORDENAR
-  // =============================
-
   const alerts: Alert[] = [...riskAlerts, ...suspiciousAlerts]
 
-  // 🔥 ordenar: primero riesgo, luego suspicious
   alerts.sort((a, b) => {
     if (a.type === "risk" && b.type !== "risk") return -1
     if (a.type !== "risk" && b.type === "risk") return 1
@@ -125,7 +119,6 @@ export default async function AdminAlertsPage() {
               }`}
             >
 
-              {/* 🔴 RIESGO CLÍNICO */}
               {alert.type === "risk" && (
                 <>
                   <p className="text-red-800 font-semibold text-lg">
@@ -133,7 +126,7 @@ export default async function AdminAlertsPage() {
                   </p>
 
                   <p className="text-red-700 mt-2">
-                    <strong>{alert.user}</strong> tiene un score de{" "}
+                    <strong>{alert.user}</strong> tiene un score{" "}
                     <strong>{alert.score}</strong>
                   </p>
 
@@ -143,7 +136,6 @@ export default async function AdminAlertsPage() {
                 </>
               )}
 
-              {/* ⚠️ ACTIVIDAD SOSPECHOSA */}
               {alert.type === "suspicious" && (
                 <>
                   <p className="text-yellow-800 font-semibold text-lg">
