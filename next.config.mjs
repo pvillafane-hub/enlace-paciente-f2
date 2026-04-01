@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    appDir: true, // ✅ asegura que Next use src/app correctamente
+    appDir: true,
   },
+  output: "standalone", // 🔥 importante en Vercel
 
   images: {
     remotePatterns: [
