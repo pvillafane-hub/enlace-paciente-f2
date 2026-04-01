@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    appDir: true, // ✅ asegura que Next use src/app correctamente
+  },
+
   images: {
     remotePatterns: [
       {
@@ -10,6 +14,6 @@ const nextConfig = {
       },
     ],
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
