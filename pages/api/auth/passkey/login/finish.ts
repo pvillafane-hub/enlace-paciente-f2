@@ -69,7 +69,6 @@ export default async function handler(
 
     console.log("🟡 MATCHED METHOD:", method)
 
-    // 🔥 UX MEJORADO
     if (!method) {
       console.warn("⚠️ Passkey no registrada en el sistema")
 
@@ -78,9 +77,16 @@ export default async function handler(
       })
     }
 
-    // 🔥 valores consistentes
-    const origin = "http://localhost:3000"
-    const rpID = "localhost"
+    // 🔥 FIX REAL (PROD vs LOCAL)
+    const isProd = process.env.NODE_ENV === 'production'
+
+    const origin = isProd
+      ? 'https://enlace-salud-seven.vercel.app'
+      : 'http://localhost:3000'
+
+    const rpID = isProd
+      ? 'enlace-salud-seven.vercel.app'
+      : 'localhost'
 
     console.log("🟡 ORIGIN:", origin)
     console.log("🟡 RP ID:", rpID)
@@ -132,11 +138,11 @@ export default async function handler(
       },
     })
 
-    const isProd = process.env.NODE_ENV === 'production'
+    const isProdCookie = process.env.NODE_ENV === 'production'
 
     res.setHeader('Set-Cookie', [
       `pp_session=${newSession.id}; Path=/; HttpOnly; ${
-        isProd ? 'Secure;' : ''
+        isProdCookie ? 'Secure;' : ''
       } SameSite=Lax`,
     ])
 

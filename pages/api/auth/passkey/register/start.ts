@@ -1,14 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
-
+// 🔥 CONFIG CORRECTO (alineado con login)
 const rpName = "Enlace Salud";
-const rpID =
-  process.env.NODE_ENV === "production"
-    ? "portal-paciente-orpin.vercel.app"
-    : "localhost";
+
+const isProd = process.env.NODE_ENV === "production";
+
+const rpID = isProd
+  ? "enlace-salud-seven.vercel.app"
+  : "localhost";
 
 export default async function handler(
   req: NextApiRequest,
@@ -30,7 +31,7 @@ export default async function handler(
       include: { user: { include: { AuthMethod: true } } },
     });
 
-    // ✅ FIX CRÍTICO
+    // ✅ Validación sólida
     if (!session || !session.user || !session.user.id) {
       return res.status(401).json({ error: "Invalid session" });
     }
@@ -42,28 +43,32 @@ export default async function handler(
       rpID,
       userID: new TextEncoder().encode(user.id),
       userName: user.email,
+
       attestationType: "none",
+
       excludeCredentials: user.AuthMethod.map((method) => ({
         id: method.credentialId,
         type: "public-key",
       })),
+
       authenticatorSelection: {
         residentKey: "required",
         userVerification: "preferred",
       },
     });
 
-    // 🔥 Guardar challenge
+    // 🔥 Guardar challenge en sesión
     await prisma.session.update({
       where: { id: sessionId },
       data: {
-        challenge: { set: options.challenge },
+        challenge: options.challenge,
       },
     });
 
     return res.status(200).json(options);
+
   } catch (error) {
-    console.error("Register Start Error:", error);
+    console.error("🔥 Register Start Error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

@@ -1,7 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
-import { rpID } from "@/config/webauthn";
 import { prisma } from "@/lib/prisma";
+
+// 🔥 FIX dinámico (alineado con finish.ts)
+const isProd = process.env.NODE_ENV === "production";
+
+const rpID = isProd
+  ? "enlace-salud-seven.vercel.app"
+  : "localhost";
 
 export default async function handler(
   req: NextApiRequest,
@@ -17,22 +23,21 @@ export default async function handler(
       userVerification: "preferred",
     });
 
-    // 🔥 GUARDAR CHALLENGE SIN REQUERIR SESIÓN
-    // Creamos sesión temporal
+    // 🔥 Guardar challenge en sesión temporal
     const tempSession = await prisma.session.create({
       data: {
-        userId: undefined, // 👈 clave
+        userId: undefined, // 👈 importante para login sin usuario previo
         challenge: options.challenge,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutos
       },
     });
 
-    const isProd = process.env.NODE_ENV === "production";
+    const isProdCookie = process.env.NODE_ENV === "production";
 
     res.setHeader(
       "Set-Cookie",
       `pp_session=${tempSession.id}; Path=/; HttpOnly; ${
-        isProd ? "Secure;" : ""
+        isProdCookie ? "Secure;" : ""
       } SameSite=Lax`
     );
 

@@ -1,18 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
+// 🔥 CONFIG CORRECTO (alineado con todo lo demás)
+const isProd = process.env.NODE_ENV === "production";
 
-const rpID =
-  process.env.NODE_ENV === "production"
-    ? "portal-paciente-orpin.vercel.app"
-    : "localhost";
+const rpID = isProd
+  ? "enlace-salud-seven.vercel.app"
+  : "localhost";
 
-const origin =
-  process.env.NODE_ENV === "production"
-    ? "https://portal-paciente-orpin.vercel.app"
-    : "http://localhost:3000";
+const origin = isProd
+  ? "https://enlace-salud-seven.vercel.app"
+  : "http://localhost:3000";
 
 export default async function handler(
   req: NextApiRequest,
@@ -33,12 +32,12 @@ export default async function handler(
       where: { id: sessionId },
     });
 
-    // ✅ FIX CRÍTICO
+    // ✅ Validación sólida
     if (!session || !session.challenge || !session.userId) {
       return res.status(400).json({ error: "Missing challenge or user" });
     }
 
-    const userId = session.userId
+    const userId = session.userId;
 
     const verification = await verifyRegistrationResponse({
       response: req.body,
@@ -55,7 +54,7 @@ export default async function handler(
 
     await prisma.authMethod.create({
       data: {
-        userId, // ✅ ya es string seguro
+        userId,
         type: "passkey",
         credentialId: credential.id,
         publicKey: Buffer.from(credential.publicKey).toString("base64"),
@@ -63,17 +62,18 @@ export default async function handler(
       },
     });
 
-    // 🔥 Limpiar challenge después de usarlo
+    // 🔥 Limpiar challenge
     await prisma.session.update({
       where: { id: sessionId },
       data: {
-        challenge: { set: null },
+        challenge: null,
       },
     });
 
     return res.status(200).json({ verified: true });
+
   } catch (error) {
-    console.error("Register Finish Error:", error);
+    console.error("🔥 Register Finish Error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 }
