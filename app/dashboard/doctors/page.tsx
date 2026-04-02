@@ -2,7 +2,7 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { revokeAccess } from "./actions"
+import { revokeAccess, inviteDoctor } from "./actions"
 
 export const dynamic = "force-dynamic"
 
