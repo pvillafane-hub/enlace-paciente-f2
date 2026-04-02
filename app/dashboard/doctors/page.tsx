@@ -58,9 +58,9 @@ export default async function DoctorsPage() {
             Autorizar un doctor
           </h2>
 
+          {/* ✅ FIX AQUÍ */}
           <form
-            action="/api/patient/invite-doctor"
-            method="POST"
+            action={inviteDoctor}
             className="flex flex-col md:flex-row gap-3"
           >
             <input
