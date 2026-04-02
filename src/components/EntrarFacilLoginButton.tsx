@@ -14,18 +14,17 @@ export default function EntrarFacilLoginButton() {
         "/api/auth/passkey/login/start",
         {
           method: "POST",
-          credentials: "include",  
+          credentials: "include",
         }
       );
 
       if (!optionsRes.ok) {
-        alert("No hay passkey registrada");
-        return;
+        throw new Error("NO_PASSKEY");
       }
 
       const options = await optionsRes.json();
 
-      // 👇 CAMBIO IMPORTANTE AQUÍ
+      // 🔥 Esto dispara Face ID / Huella
       const assertion = await startAuthentication({
         optionsJSON: options,
       });
@@ -41,15 +40,23 @@ export default function EntrarFacilLoginButton() {
       );
 
       if (!verifyRes.ok) {
-        alert("Error autenticando");
-        return;
+        throw new Error("VERIFY_FAILED");
       }
 
       window.location.href = "/dashboard";
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Error iniciando Entrar Fácil");
+
+      // 🔥 UX para viejitos (CLAVE)
+      if (err.name === "NotAllowedError") {
+        alert("No se pudo usar la huella o Face ID");
+      } else if (err.message === "NO_PASSKEY") {
+        alert("Primero debes activar Entrar Fácil");
+      } else {
+        alert("No se pudo iniciar sesión. Intenta nuevamente.");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -59,9 +66,15 @@ export default function EntrarFacilLoginButton() {
     <button
       onClick={handleLogin}
       disabled={loading}
-      className="w-full bg-green-600 hover:bg-green-700 text-white py-5 rounded-2xl text-2xl font-semibold transition"
+      className="w-full bg-green-600 hover:bg-green-700 text-white py-5 rounded-2xl text-2xl font-semibold transition flex items-center justify-center gap-3"
     >
-      {loading ? "Ingresando..." : "🔐 Entrar Fácil"}
+      {loading ? (
+        "Usando huella o Face ID..."
+      ) : (
+        <>
+          👆 Entrar Fácil
+        </>
+      )}
     </button>
   );
 }
