@@ -163,7 +163,6 @@ export default async function PatientPage({
         <h1 className="text-3xl font-bold">{patient.fullName}</h1>
         <p className="text-gray-500 mt-2">{patient.email}</p>
 
-        {/* 💥 MENSAJES POR PACIENTE */}
         {isDemo && patientId === "1" && (
           <p className="text-sm text-green-600 mt-2">
             📌 Paciente con estudio reciente disponible
@@ -183,7 +182,7 @@ export default async function PatientPage({
         )}
       </div>
 
-      {/* 💥 MENSAJE GUIADO */}
+      {/* MENSAJE DEMO */}
       {isDemo && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-sm">
           👋 Bienvenido Doctor. Este es un expediente de ejemplo.  
@@ -223,13 +222,23 @@ export default async function PatientPage({
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-4">💊 Medicamentos</h2>
 
-        {patientId !== "3" ? (
+        {isDemo && patientId !== "3" && (
           <div className="grid grid-cols-2 gap-4">
             <img src="/demo/meds/lisinopril.jpg" className="rounded-xl border" />
             <img src="/demo/meds/metformina.jpg" className="rounded-xl border" />
           </div>
-        ) : (
-          <p className="text-gray-500">{meds.length} documento(s)</p>
+        )}
+
+        {!isDemo && meds.length > 0 && (
+          <p className="text-gray-700">
+            {meds.length} medicamento(s) registrado(s)
+          </p>
+        )}
+
+        {!isDemo && meds.length === 0 && (
+          <p className="text-gray-500">
+            No hay medicamentos disponibles.
+          </p>
         )}
       </div>
 
@@ -252,7 +261,7 @@ export default async function PatientPage({
 
       </div>
 
-      {/* 💥 BOTÓN DE CIERRE */}
+      {/* BOTÓN DEMO */}
       {isDemo && (
         <div className="pt-6">
           <a
