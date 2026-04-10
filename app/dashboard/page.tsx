@@ -10,7 +10,6 @@ export default async function Dashboard() {
 
   const session = await getValidatedSession()
 
-  // ✅ FIX AQUÍ
   if (!session?.userId) {
     redirect("/?auth=required")
   }
@@ -39,27 +38,74 @@ export default async function Dashboard() {
 
   const passkeyEnabled = Boolean(passkey)
 
+  // 🔥 DETECTAR DEMO
+  const isDemo = userData.email === "doctor_demo@enlace.com"
+
   // -----------------------------
   // DASHBOARD DOCTOR
   // -----------------------------
 
   if (isDoctor) {
 
-    const patientsData = await prisma.doctorPatient.findMany({
-      where: {
-        doctorId: userData.id
-      },
-      include: {
-        patient: {
-          include: {
-            documents: {
-              orderBy: { createdAt: "desc" },
-              take: 5
+    let patientsData
+
+    if (isDemo) {
+      // 💥 DATA DEMO (NO TOCA DB)
+      patientsData = [
+        {
+          patient: {
+            id: "1",
+            fullName: "Juan Pérez",
+            email: "juan@email.com",
+            createdAt: new Date(),
+            documents: [
+              {
+                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 65)
+              }
+            ]
+          }
+        },
+        {
+          patient: {
+            id: "2",
+            fullName: "María del Carmen",
+            email: "maria@email.com",
+            createdAt: new Date(),
+            documents: [
+              {
+                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20)
+              }
+            ]
+          }
+        },
+        {
+          patient: {
+            id: "3",
+            fullName: "Ana Vélez",
+            email: "ana@email.com",
+            createdAt: new Date(),
+            documents: []
+          }
+        }
+      ]
+    } else {
+      // 🟢 DATA REAL
+      patientsData = await prisma.doctorPatient.findMany({
+        where: {
+          doctorId: userData.id
+        },
+        include: {
+          patient: {
+            include: {
+              documents: {
+                orderBy: { createdAt: "desc" },
+                take: 5
+              }
             }
           }
         }
-      }
-    })
+      })
+    }
 
     const patients = patientsData.map(p => {
 
@@ -67,7 +113,6 @@ export default async function Dashboard() {
 
       let score = 0
 
-      // 🔥 FIX REAL
       if (!docs || docs.length === 0) {
         score = 0
       } else {
@@ -103,7 +148,6 @@ export default async function Dashboard() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
 
-    // 🆕 PACIENTES NUEVOS HOY
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -251,7 +295,7 @@ export default async function Dashboard() {
   }
 
   // -----------------------------
-  // DASHBOARD PACIENTE
+  // DASHBOARD PACIENTE (NO TOCADO)
   // -----------------------------
 
   const needsProfile =

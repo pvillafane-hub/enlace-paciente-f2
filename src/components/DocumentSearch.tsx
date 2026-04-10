@@ -9,11 +9,11 @@ export default function DocumentSearch({ documents }: any) {
   const filtered = documents.filter((doc: any) => {
 
     const text =
-      doc.filename +
+      (doc.filename || "") +
       " " +
-      doc.docType +
+      (doc.docType || "") +
       " " +
-      doc.facility
+      (doc.facility || "")
 
     return text.toLowerCase().includes(query.toLowerCase())
 
@@ -49,29 +49,43 @@ export default function DocumentSearch({ documents }: any) {
 
           <div
             key={doc.id}
-            className="border rounded-lg p-4 flex justify-between items-center"
+            className="border rounded-lg p-4 flex justify-between items-center hover:bg-gray-50 transition"
           >
 
-            <div>
+            <div className="flex items-center gap-4">
 
-              <p className="font-semibold">
-                {doc.filename}
-              </p>
+              {/* 🔥 PREVIEW VISUAL */}
+              {doc.filePath && (
+                <img
+                  src={doc.filePath}
+                  className="w-16 h-16 object-cover rounded-lg border"
+                />
+              )}
 
-              <p className="text-sm text-gray-500">
-                {doc.docType} · {doc.facility}
-              </p>
+              <div>
 
-              <p className="text-xs text-gray-400">
-                {doc.studyDate}
-              </p>
+                <p className="font-semibold">
+                  {doc.filename}
+                </p>
+
+                <p className="text-sm text-gray-500">
+                  {doc.docType} · {doc.facility}
+                </p>
+
+                <p className="text-xs text-gray-400">
+                  {doc.studyDate}
+                </p>
+
+              </div>
 
             </div>
 
+            {/* 🔥 FIX CRÍTICO AQUÍ */}
             <a
-              href={`/api/documents/view?id=${doc.id}`}
+              href={doc.filePath || `/api/documents/view?id=${doc.id}`}
               target="_blank"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              rel="noopener noreferrer"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
             >
               Ver
             </a>
