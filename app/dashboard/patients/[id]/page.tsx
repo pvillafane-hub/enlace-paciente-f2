@@ -223,7 +223,7 @@ export default async function PatientPage({
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-4">💊 Medicamentos</h2>
 
-        {isDemo && patientId !== "3" ? (
+        {patientId !== "3" ? (
           <div className="grid grid-cols-2 gap-4">
             <img src="/demo/meds/lisinopril.jpg" className="rounded-xl border" />
             <img src="/demo/meds/metformina.jpg" className="rounded-xl border" />
