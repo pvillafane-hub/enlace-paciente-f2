@@ -1,0 +1,530 @@
+[1mdiff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx[m
+[1mindex a67e60a..70ae659 100644[m
+[1m--- a/app/dashboard/page.tsx[m
+[1m+++ b/app/dashboard/page.tsx[m
+[36m@@ -10,7 +10,6 @@[m [mexport default async function Dashboard() {[m
+ [m
+   const session = await getValidatedSession()[m
+ [m
+[31m-  // ✅ FIX AQUÍ[m
+   if (!session?.userId) {[m
+     redirect("/?auth=required")[m
+   }[m
+[36m@@ -39,27 +38,74 @@[m [mexport default async function Dashboard() {[m
+ [m
+   const passkeyEnabled = Boolean(passkey)[m
+ [m
+[32m+[m[32m  // 🔥 DETECTAR DEMO[m
+[32m+[m[32m  const isDemo = userData.email === "doctor_demo@enlace.com"[m
+[32m+[m
+   // -----------------------------[m
+   // DASHBOARD DOCTOR[m
+   // -----------------------------[m
+ [m
+   if (isDoctor) {[m
+ [m
+[31m-    const patientsData = await prisma.doctorPatient.findMany({[m
+[31m-      where: {[m
+[31m-        doctorId: userData.id[m
+[31m-      },[m
+[31m-      include: {[m
+[31m-        patient: {[m
+[31m-          include: {[m
+[31m-            documents: {[m
+[31m-              orderBy: { createdAt: "desc" },[m
+[31m-              take: 5[m
+[32m+[m[32m    let patientsData[m
+[32m+[m
+[32m+[m[32m    if (isDemo) {[m
+[32m+[m[32m      // 💥 DATA DEMO (NO TOCA DB)[m
+[32m+[m[32m      patientsData = [[m
+[32m+[m[32m        {[m
+[32m+[m[32m          patient: {[m
+[32m+[m[32m            id: "1",[m
+[32m+[m[32m            fullName: "Juan Pérez",[m
+[32m+[m[32m            email: "juan@email.com",[m
+[32m+[m[32m            createdAt: new Date(),[m
+[32m+[m[32m            documents: [[m
+[32m+[m[32m              {[m
+[32m+[m[32m                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 65)[m
+[32m+[m[32m              }[m
+[32m+[m[32m            ][m
+[32m+[m[32m          }[m
+[32m+[m[32m        },[m
+[32m+[m[32m        {[m
+[32m+[m[32m          patient: {[m
+[32m+[m[32m            id: "2",[m
+[32m+[m[32m            fullName: "María del Carmen",[m
+[32m+[m[32m            email: "maria@email.com",[m
+[32m+[m[32m            createdAt: new Date(),[m
+[32m+[m[32m            documents: [[m
+[32m+[m[32m              {[m
+[32m+[m[32m                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20)[m
+[32m+[m[32m              }[m
+[32m+[m[32m            ][m
+[32m+[m[32m          }[m
+[32m+[m[32m        },[m
+[32m+[m[32m        {[m
+[32m+[m[32m          patient: {[m
+[32m+[m[32m            id: "3",[m
+[32m+[m[32m            fullName: "Ana Vélez",[m
+[32m+[m[32m            email: "ana@email.com",[m
+[32m+[m[32m            createdAt: new Date(),[m
+[32m+[m[32m            documents: [][m
+[32m+[m[32m          }[m
+[32m+[m[32m        }[m
+[32m+[m[32m      ][m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      // 🟢 DATA REAL[m
+[32m+[m[32m      patientsData = await prisma.doctorPatient.findMany({[m
+[32m+[m[32m        where: {[m
+[32m+[m[32m          doctorId: userData.id[m
+[32m+[m[32m        },[m
+[32m+[m[32m        include: {[m
+[32m+[m[32m          patient: {[m
+[32m+[m[32m            include: {[m
+[32m+[m[32m              documents: {[m
+[32m+[m[32m                orderBy: { createdAt: "desc" },[m
+[32m+[m[32m                take: 5[m
+[32m+[m[32m              }[m
+             }[m
+           }[m
+         }[m
+[31m-      }[m
+[31m-    })[m
+[32m+[m[32m      })[m
+[32m+[m[32m    }[m
+ [m
+     const patients = patientsData.map(p => {[m
+ [m
+[36m@@ -67,7 +113,6 @@[m [mexport default async function Dashboard() {[m
+ [m
+       let score = 0[m
+ [m
+[31m-      // 🔥 FIX REAL[m
+       if (!docs || docs.length === 0) {[m
+         score = 0[m
+       } else {[m
+[36m@@ -103,7 +148,6 @@[m [mexport default async function Dashboard() {[m
+       .sort((a, b) => b.score - a.score)[m
+       .slice(0, 5)[m
+ [m
+[31m-    // 🆕 PACIENTES NUEVOS HOY[m
+     const today = new Date()[m
+     today.setHours(0, 0, 0, 0)[m
+ [m
+[36m@@ -251,7 +295,7 @@[m [mexport default async function Dashboard() {[m
+   }[m
+ [m
+   // -----------------------------[m
+[31m-  // DASHBOARD PACIENTE[m
+[32m+[m[32m  // DASHBOARD PACIENTE (NO TOCADO)[m
+   // -----------------------------[m
+ [m
+   const needsProfile =[m
+[1mdiff --git a/app/dashboard/patients/[id]/page.tsx b/app/dashboard/patients/[id]/page.tsx[m
+[1mindex 5088369..0f1f537 100644[m
+[1m--- a/app/dashboard/patients/[id]/page.tsx[m
+[1m+++ b/app/dashboard/patients/[id]/page.tsx[m
+[36m@@ -11,7 +11,6 @@[m [mexport default async function PatientPage({[m
+ [m
+   const session = await getValidatedSession()[m
+ [m
+[31m-  // ✅ FIX CRÍTICO[m
+   if (!session?.userId) {[m
+     redirect('/?auth=required')[m
+   }[m
+[36m@@ -23,102 +22,183 @@[m [mexport default async function PatientPage({[m
+     redirect('/dashboard')[m
+   }[m
+ [m
+[31m-  const access = await prisma.doctorPatient.findFirst({[m
+[31m-    where: {[m
+[31m-      doctorId,[m
+[31m-      patientId[m
+[31m-    }[m
+[32m+[m[32m  const user = await prisma.user.findUnique({[m
+[32m+[m[32m    where: { id: session.userId }[m
+   })[m
+ [m
+[31m-  if (!access) {[m
+[32m+[m[32m  if (!user) {[m
+     redirect('/dashboard')[m
+   }[m
+ [m
+[31m-  // 🔥 RESOLVER ALERTAS AUTOMÁTICAMENTE[m
+[31m-  await prisma.medicalAlert.updateMany({[m
+[31m-    where: {[m
+[31m-      doctorId,[m
+[31m-      patientId,[m
+[31m-      resolved: false[m
+[31m-    },[m
+[31m-    data: {[m
+[31m-      resolved: true,[m
+[31m-      resolvedAt: new Date()[m
+[31m-    }[m
+[31m-  })[m
+[32m+[m[32m  const isDemo = user.email === "doctor_demo@enlace.com"[m
+ [m
+[31m-  const patient = await prisma.user.findUnique({[m
+[31m-    where: { id: patientId },[m
+[31m-    include: {[m
+[31m-      documents: {[m
+[31m-        orderBy: {[m
+[31m-          studyDate: 'desc'[m
+[31m-        }[m
+[31m-      }[m
+[31m-    }[m
+[31m-  })[m
+[32m+[m[32m  if (!isDemo) {[m
+[32m+[m[32m    const access = await prisma.doctorPatient.findFirst({[m
+[32m+[m[32m      where: { doctorId, patientId }[m
+[32m+[m[32m    })[m
+ [m
+[31m-  if (!patient) {[m
+[31m-    redirect('/dashboard')[m
+[31m-  }[m
+[32m+[m[32m    if (!access) {[m
+[32m+[m[32m      redirect('/dashboard')[m
+[32m+[m[32m    }[m
+ [m
+[31m-  if (!patient.active) {[m
+[31m-    redirect('/dashboard')[m
+[32m+[m[32m    await prisma.medicalAlert.updateMany({[m
+[32m+[m[32m      where: {[m
+[32m+[m[32m        doctorId,[m
+[32m+[m[32m        patientId,[m
+[32m+[m[32m        resolved: false[m
+[32m+[m[32m      },[m
+[32m+[m[32m      data: {[m
+[32m+[m[32m        resolved: true,[m
+[32m+[m[32m        resolvedAt: new Date()[m
+[32m+[m[32m      }[m
+[32m+[m[32m    })[m
+   }[m
+ [m
+[31m-  // 🔥 VACUNAS[m
+[31m-  const vaccines = patient.documents.filter([m
+[31m-    doc => doc.docType === "Vacunas"[m
+[31m-  )[m
+[32m+[m[32m  let patient[m
+[32m+[m
+[32m+[m[32m  if (isDemo) {[m
+[32m+[m
+[32m+[m[32m    if (patientId === "1") {[m
+[32m+[m[32m      patient = {[m
+[32m+[m[32m        id: "1",[m
+[32m+[m[32m        fullName: "Juan Pérez",[m
+[32m+[m[32m        email: "juan@email.com",[m
+[32m+[m[32m        active: true,[m
+[32m+[m[32m        dateOfBirth: new Date("1958-03-12"),[m
+[32m+[m[32m        bloodType: "O+",[m
+[32m+[m[32m        allergies: "Penicilina",[m
+[32m+[m[32m        documents: [[m
+[32m+[m[32m          {[m
+[32m+[m[32m            id: "doc1",[m
+[32m+[m[32m            filename: "Radiografía de tórax",[m
+[32m+[m[32m            docType: "Radiografía",[m
+[32m+[m[32m            facility: "Hospital San Pablo",[m
+[32m+[m[32m            studyDate: new Date(),[m
+[32m+[m[32m            createdAt: new Date(),[m
+[32m+[m[32m            filePath: "/demo/docs/radiografia.jpg",[m
+[32m+[m[32m            userId: "demo",[m
+[32m+[m[32m            deletedAt: null,[m
+[32m+[m[32m          }[m
+[32m+[m[32m        ][m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+ [m
+[31m-  // 🔥 MEDICAMENTOS[m
+[31m-  const meds = patient.documents.filter([m
+[31m-    doc => doc.docType === "Medicamentos"[m
+[31m-  )[m
+[32m+[m[32m    else if (patientId === "2") {[m
+[32m+[m[32m      patient = {[m
+[32m+[m[32m        id: "2",[m
+[32m+[m[32m        fullName: "María del Carmen",[m
+[32m+[m[32m        email: "maria@email.com",[m
+[32m+[m[32m        active: true,[m
+[32m+[m[32m        dateOfBirth: new Date("1949-07-22"),[m
+[32m+[m[32m        bloodType: "A+",[m
+[32m+[m[32m        allergies: "Aspirina",[m
+[32m+[m[32m        documents: [[m
+[32m+[m[32m          {[m
+[32m+[m[32m            id: "doc2",[m
+[32m+[m[32m            filename: "Laboratorio clínico",[m
+[32m+[m[32m            docType: "Laboratorio",[m
+[32m+[m[32m            facility: "Laboratorio Clínico PR",[m
+[32m+[m[32m            studyDate: new Date(),[m
+[32m+[m[32m            createdAt: new Date(),[m
+[32m+[m[32m            filePath: "/demo/docs/laboratorio-maria-del-carmen.jpg",[m
+[32m+[m[32m            userId: "demo",[m
+[32m+[m[32m            deletedAt: null,[m
+[32m+[m[32m          }[m
+[32m+[m[32m        ][m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+ [m
+[31m-  // ------------------------------[m
+[31m-  // Timeline[m
+[31m-  // ------------------------------[m
+[32m+[m[32m    else {[m
+[32m+[m[32m      patient = {[m
+[32m+[m[32m        id: "3",[m
+[32m+[m[32m        fullName: "Ana Vélez",[m
+[32m+[m[32m        email: "ana@email.com",[m
+[32m+[m[32m        active: true,[m
+[32m+[m[32m        dateOfBirth: null,[m
+[32m+[m[32m        bloodType: null,[m
+[32m+[m[32m        allergies: null,[m
+[32m+[m[32m        documents: [][m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+ [m
+[31m-  const timeline: Record<string, typeof patient.documents> = {}[m
+[32m+[m[32m  else {[m
+[32m+[m[32m    const realPatient = await prisma.user.findUnique({[m
+[32m+[m[32m      where: { id: patientId },[m
+[32m+[m[32m      include: {[m
+[32m+[m[32m        documents: {[m
+[32m+[m[32m          orderBy: { studyDate: 'desc' }[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }[m
+[32m+[m[32m    })[m
+ [m
+[31m-  for (const doc of patient.documents) {[m
+[31m-    const year = new Date(doc.studyDate).getFullYear().toString()[m
+[32m+[m[32m    if (!realPatient) {[m
+[32m+[m[32m      redirect('/dashboard')[m
+[32m+[m[32m    }[m
+ [m
+[31m-    if (!timeline[year]) {[m
+[31m-      timeline[year] = [][m
+[32m+[m[32m    patient = {[m
+[32m+[m[32m      ...realPatient,[m
+[32m+[m[32m      documents: realPatient.documents.map(doc => ({[m
+[32m+[m[32m        ...doc,[m
+[32m+[m[32m        studyDate: new Date(doc.studyDate),[m
+[32m+[m[32m        deletedAt: null[m
+[32m+[m[32m      }))[m
+     }[m
+[32m+[m[32m  }[m
+ [m
+[31m-    timeline[year].push(doc)[m
+[32m+[m[32m  if (!isDemo && !patient.active) {[m
+[32m+[m[32m    redirect('/dashboard')[m
+   }[m
+ [m
+[31m-  const years = Object.keys(timeline).sort((a, b) => Number(b) - Number(a))[m
+[32m+[m[32m  const meds = patient.documents.filter([m
+[32m+[m[32m    doc => doc.docType === "Medicamentos"[m
+[32m+[m[32m  )[m
+ [m
+   return ([m
+ [m
+     <div className="max-w-5xl mx-auto space-y-8">[m
+ [m
+[31m-      {/* Encabezado */}[m
+[32m+[m[32m      {/* HEADER */}[m
+       <div className="bg-white rounded-xl p-6 shadow-sm border">[m
+[31m-        <h1 className="text-3xl font-bold">[m
+[31m-          {patient.fullName}[m
+[31m-        </h1>[m
+[32m+[m[32m        <h1 className="text-3xl font-bold">{patient.fullName}</h1>[m
+[32m+[m[32m        <p className="text-gray-500 mt-2">{patient.email}</p>[m
+[32m+[m
+[32m+[m[32m        {/* 💥 MENSAJES POR PACIENTE */}[m
+[32m+[m[32m        {isDemo && patientId === "1" && ([m
+[32m+[m[32m          <p className="text-sm text-green-600 mt-2">[m
+[32m+[m[32m            📌 Paciente con estudio reciente disponible[m
+[32m+[m[32m          </p>[m
+[32m+[m[32m        )}[m
+[32m+[m
+[32m+[m[32m        {isDemo && patientId === "2" && ([m
+[32m+[m[32m          <p className="text-sm text-purple-600 mt-2">[m
+[32m+[m[32m            🧪 Nuevo resultado de laboratorio disponible[m
+[32m+[m[32m          </p>[m
+[32m+[m[32m        )}[m
+ [m
+[31m-        <p className="text-gray-500 mt-2">[m
+[31m-          {patient.email}[m
+[31m-        </p>[m
+[32m+[m[32m        {isDemo && patientId === "3" && ([m
+[32m+[m[32m          <p className="text-sm text-gray-500 mt-2">[m
+[32m+[m[32m            🆕 Paciente nuevo sin historial aún[m
+[32m+[m[32m          </p>[m
+[32m+[m[32m        )}[m
+       </div>[m
+ [m
+[31m-      {/* INFO CLÍNICA */}[m
+[32m+[m[32m      {/* 💥 MENSAJE GUIADO */}[m
+[32m+[m[32m      {isDemo && ([m
+[32m+[m[32m        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-sm">[m
+[32m+[m[32m          👋 Bienvenido Doctor. Este es un expediente de ejemplo.[m[41m  [m
+[32m+[m[32m          Revise los documentos y vea cómo puede acceder a la información en segundos.[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m      )}[m
+[32m+[m
+[32m+[m[32m      {/* INFO */}[m
+       <div className="bg-white rounded-xl p-6 shadow-sm border">[m
+[31m-        <h2 className="text-xl font-semibold mb-4">[m
+[31m-          Información del paciente[m
+[31m-        </h2>[m
+[32m+[m[32m        <h2 className="text-xl font-semibold mb-4">Información del paciente</h2>[m
+ [m
+         <div className="grid md:grid-cols-3 gap-4">[m
+ [m
+           <div className="bg-blue-50 p-4 rounded-xl">[m
+[31m-            <p className="text-gray-500 text-sm">Fecha de nacimiento</p>[m
+[32m+[m[32m            <p className="text-sm text-gray-500">Fecha de nacimiento</p>[m
+             <p className="text-lg font-semibold">[m
+               {patient.dateOfBirth[m
+                 ? new Date(patient.dateOfBirth).toLocaleDateString('es-PR')[m
+[36m@@ -127,156 +207,63 @@[m [mexport default async function PatientPage({[m
+           </div>[m
+ [m
+           <div className="bg-red-50 p-4 rounded-xl">[m
+[31m-            <p className="text-gray-500 text-sm">Tipo de sangre</p>[m
+[31m-            <p className="text-lg font-semibold">[m
+[31m-              {patient.bloodType || "No registrado"}[m
+[31m-            </p>[m
+[32m+[m[32m            <p className="text-sm text-gray-500">Tipo de sangre</p>[m
+[32m+[m[32m            <p className="text-lg font-semibold">{patient.bloodType || "No registrado"}</p>[m
+           </div>[m
+ [m
+           <div className="bg-yellow-50 p-4 rounded-xl">[m
+[31m-            <p className="text-gray-500 text-sm">Alergias</p>[m
+[31m-            <p className="text-lg font-semibold">[m
+[31m-              {patient.allergies || "Ninguna registrada"}[m
+[31m-            </p>[m
+[32m+[m[32m            <p className="text-sm text-gray-500">Alergias</p>[m
+[32m+[m[32m            <p className="text-lg font-semibold">{patient.allergies || "No registradas"}</p>[m
+           </div>[m
+ [m
+         </div>[m
+       </div>[m
+ [m
+[31m-      {/* 💉 VACUNAS */}[m
+[31m-      {vaccines.length > 0 && ([m
+[31m-        <div className="bg-white rounded-xl p-6 shadow-sm border">[m
+[31m-[m
+[31m-          <h2 className="text-xl font-semibold mb-4">[m
+[31m-            💉 Vacunas del paciente[m
+[31m-          </h2>[m
+[31m-[m
+[31m-          <div className="space-y-3">[m
+[31m-[m
+[31m-            {vaccines.map(v => ([m
+[31m-              <div[m
+[31m-                key={v.id}[m
+[31m-                className="flex justify-between items-center bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition"[m
+[31m-              >[m
+[31m-                <div>[m
+[31m-                  <p className="font-semibold">{v.filename}</p>[m
+[31m-                  <p className="text-sm text-gray-500">[m
+[31m-                    {v.facility}[m
+[31m-                  </p>[m
+[31m-                  <p className="text-xs text-gray-400">[m
+[31m-                    {v.studyDate}[m
+[31m-                  </p>[m
+[31m-                </div>[m
+[31m-[m
+[31m-                <a[m
+[31m-                  href={`/api/documents/view?id=${v.id}`}[m
+[31m-                  target="_blank"[m
+[31m-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"[m
+[31m-                >[m
+[31m-                  Ver[m
+[31m-                </a>[m
+[31m-[m
+[31m-              </div>[m
+[31m-            ))}[m
+[31m-[m
+[31m-          </div>[m
+[31m-        </div>[m
+[31m-      )}[m
+[31m-[m
+[31m-      {/* 💊 MEDICAMENTOS */}[m
+[31m-      {meds.length > 0 && ([m
+[31m-        <div className="bg-white rounded-xl p-6 shadow-sm border flex justify-between items-center">[m
+[32m+[m[32m      {/* MEDS */}[m
+[32m+[m[32m      <div className="bg-white rounded-xl p-6 shadow-sm border">[m
+[32m+[m[32m        <h2 className="text-xl font-semibold mb-4">💊 Medicamentos</h2>[m
+ [m
+[31m-          <div>[m
+[31m-            <p className="font-semibold text-lg">[m
+[31m-              💊 Medicamentos del paciente[m
+[31m-            </p>[m
+[31m-            <p className="text-sm text-gray-500">[m
+[31m-              {meds.length} documento(s) disponibles[m
+[31m-            </p>[m
+[32m+[m[32m        {isDemo && patientId !== "3" ? ([m
+[32m+[m[32m          <div className="grid grid-cols-2 gap-4">[m
+[32m+[m[32m            <img src="/demo/meds/lisinopril.jpg" className="rounded-xl border" />[m
+[32m+[m[32m            <img src="/demo/meds/metformina.jpg" className="rounded-xl border" />[m
+           </div>[m
+[31m-[m
+[31m-          <a[m
+[31m-            href={`/dashboard/patients/${patient.id}/medications`}[m
+[31m-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"[m
+[31m-          >[m
+[31m-            Ver[m
+[31m-          </a>[m
+[31m-[m
+[31m-        </div>[m
+[31m-      )}[m
+[32m+[m[32m        ) : ([m
+[32m+[m[32m          <p className="text-gray-500">{meds.length} documento(s)</p>[m
+[32m+[m[32m        )}[m
+[32m+[m[32m      </div>[m
+ [m
+       {/* HISTORIAL */}[m
+       <div className="bg-white rounded-xl p-6 shadow-sm border">[m
+ [m
+[31m-        <h2 className="text-xl font-semibold mb-6">[m
+[31m-          Historial médico[m
+[31m-        </h2>[m
+[32m+[m[32m        <h2 className="text-xl font-semibold mb-6">Historial médico</h2>[m
+ [m
+         <div className="mb-10">[m
+[31m-          <DocumentSearch documents={patient.documents} />[m
+[32m+[m[32m          <DocumentSearch[m
+[32m+[m[32m            documents={patient.documents.map(doc => ({[m
+[32m+[m[32m              ...doc,[m
+[32m+[m[32m              studyDate:[m
+[32m+[m[32m                doc.studyDate instanceof Date[m
+[32m+[m[32m                  ? doc.studyDate.toISOString()[m
+[32m+[m[32m                  : doc.studyDate[m
+[32m+[m[32m            }))}[m
+[32m+[m[32m          />[m
+         </div>[m
+ [m
+[31m-        {patient.documents.length === 0 && ([m
+[31m-          <p className="text-gray-500">[m
+[31m-            Este paciente no tiene documentos.[m
+[31m-          </p>[m
+[31m-        )}[m
+[31m-[m
+[31m-        <div className="space-y-10">[m
+[31m-[m
+[31m-          {years.map((year) => ([m
+[31m-[m
+[31m-            <div key={year}>[m
+[31m-[m
+[31m-              <h3 className="text-lg font-bold text-gray-700 mb-4">[m
+[31m-                {year}[m
+[31m-              </h3>[m
+[31m-[m
+[31m-              <div className="border-l-2 border-blue-200 pl-6 space-y-4">[m
+[31m-[m
+[31m-                {timeline[year].map((doc) => ([m
+[31m-[m
+[31m-                  <div[m
+[31m-                    key={doc.id}[m
+[31m-                    className="flex justify-between items-center bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition"[m
+[31m-                  >[m
+[31m-[m
+[31m-                    <div>[m
+[31m-                      <p className="font-semibold">[m
+[31m-                        {d
