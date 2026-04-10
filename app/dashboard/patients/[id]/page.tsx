@@ -151,7 +151,7 @@ export default async function PatientPage({
   }
 
   const meds = patient.documents.filter(
-    doc => doc.docType === "Medicamentos"
+    (doc: any) => doc.docType === "Medicamentos"
   )
 
   return (
@@ -222,6 +222,7 @@ export default async function PatientPage({
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-4">💊 Medicamentos</h2>
 
+        {/* DEMO */}
         {isDemo && patientId !== "3" && (
           <div className="grid grid-cols-2 gap-4">
             <img src="/demo/meds/lisinopril.jpg" className="rounded-xl border" />
@@ -229,12 +230,34 @@ export default async function PatientPage({
           </div>
         )}
 
+        {/* REAL CON MEDS */}
         {!isDemo && meds.length > 0 && (
-          <p className="text-gray-700">
-            {meds.length} medicamento(s) registrado(s)
-          </p>
+          <div className="space-y-3">
+            {meds.map((doc: any) => (
+              <div
+                key={doc.id}
+                className="flex justify-between items-center border rounded-lg p-3"
+              >
+                <div>
+                  <p className="font-medium">{doc.filename}</p>
+                  <p className="text-sm text-gray-500">
+                    {doc.facility || "Sin origen"}
+                  </p>
+                </div>
+
+                <a
+                  href={`/api/documents/view?id=${doc.id}`}
+                  target="_blank"
+                  className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700"
+                >
+                  Ver
+                </a>
+              </div>
+            ))}
+          </div>
         )}
 
+        {/* REAL SIN MEDS */}
         {!isDemo && meds.length === 0 && (
           <p className="text-gray-500">
             No hay medicamentos disponibles.
@@ -244,7 +267,6 @@ export default async function PatientPage({
 
       {/* HISTORIAL */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
-
         <h2 className="text-xl font-semibold mb-6">Historial médico</h2>
 
         <div className="mb-10">
@@ -258,7 +280,6 @@ export default async function PatientPage({
             }))}
           />
         </div>
-
       </div>
 
       {/* BOTÓN DEMO */}
