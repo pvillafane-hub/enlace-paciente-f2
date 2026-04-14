@@ -2,12 +2,10 @@ export const dynamic = "force-dynamic";
 
 import LandingClient from "./LandingClient";
 
-export default async function Page({
+export default function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ auth?: string }>;
+  searchParams?: { auth?: string };
 }) {
-  const params = await searchParams;
-
-  return <LandingClient auth={params?.auth} />;
+  return <LandingClient auth={searchParams?.auth} />;
 }
