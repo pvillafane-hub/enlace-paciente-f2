@@ -7,7 +7,6 @@ export default async function PatientsPage() {
 
   const session = await getValidatedSession()
 
-  // ✅ FIX CRÍTICO
   if (!session?.userId) {
     redirect('/?auth=required')
   }
@@ -61,7 +60,10 @@ export default async function PatientsPage() {
 
       if (score > 100) score = 100
 
-      // 🚨 ALERTA AUTOMÁTICA (SIN DUPLICADOS)
+      // 🔥 NUEVO: clasificación clínica correcta
+      const isHighNeed = score >= 70
+
+      // 🚨 ALERTA AUTOMÁTICA
       if (score >= 80) {
 
         const existingAlert = await prisma.auditLog.findFirst({
@@ -90,17 +92,32 @@ export default async function PatientsPage() {
 
       const lastDoc = docs[0]
 
+      // 🔥 NUEVO: calcular días desde último doc
+      let diffDays = null
+
+      if (lastDoc) {
+        diffDays = Math.floor(
+          (now - new Date(lastDoc.createdAt).getTime()) /
+          (1000 * 60 * 60 * 24)
+        )
+      }
+
       return {
         id: p.patient.id,
         fullName: p.patient.fullName,
         email: p.patient.email,
+
+        // 👇 esto lo usará el frontend
         riskScore: score,
+        isHighNeed,
+
         lastDoc: lastDoc
           ? {
               docType: lastDoc.docType,
               facility: lastDoc.facility,
               studyDate: lastDoc.studyDate,
-              createdAt: lastDoc.createdAt.toISOString()
+              createdAt: lastDoc.createdAt.toISOString(),
+              diffDays // 🔥 NUEVO
             }
           : null
       }

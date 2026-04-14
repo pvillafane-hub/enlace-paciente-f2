@@ -25,31 +25,16 @@ export default function PatientsSearch({ patients }: { patients: Patient[] }) {
     p.email.toLowerCase().includes(query.toLowerCase())
   )
 
-  // 🔥 ORDENAR POR RIESGO (ALTO → BAJO)
+  // 🔥 ORDENAR POR PRIORIDAD
   const sorted = [...filtered].sort(
     (a, b) => b.riskScore - a.riskScore
   )
-
-  // 🎨 COLOR DEL SCORE
-  const getRiskColor = (score: number) => {
-    if (score >= 70) return "bg-red-500"
-    if (score >= 30) return "bg-yellow-500"
-    return "bg-green-500"
-  }
-
-  // 🏷 LABEL DEL SCORE
-  const getRiskLabel = (score: number) => {
-    if (score >= 70) return "Alto"
-    if (score >= 30) return "Medio"
-    return "Bajo"
-  }
 
   return (
 
     <div className="space-y-6">
 
       {/* 🔍 SEARCH */}
-
       <input
         type="text"
         placeholder="Buscar paciente..."
@@ -59,91 +44,99 @@ export default function PatientsSearch({ patients }: { patients: Patient[] }) {
       />
 
       {/* 📋 LIST */}
-
       <div className="space-y-4">
 
-        {sorted.map((p) => (
+        {sorted.map((p) => {
 
-          <div
-            key={p.id}
-            className="bg-white border rounded-xl p-5 flex justify-between items-center hover:shadow-md transition"
-          >
+          const isHighNeed = p.riskScore >= 70
 
-            {/* 🧑 INFO */}
-            <div className="space-y-2">
+          let diffDays = null
 
-              <p className="text-lg font-semibold">
-                {p.fullName}
-              </p>
+          if (p.lastDoc?.createdAt) {
+            const now = Date.now()
+            diffDays = Math.floor(
+              (now - new Date(p.lastDoc.createdAt).getTime()) /
+              (1000 * 60 * 60 * 24)
+            )
+          }
 
-              <p className="text-sm text-gray-500">
-                {p.email}
-              </p>
+          return (
 
-              {/* 🔥 SCORE VISUAL */}
-              <div className="mt-3 w-52">
+            <div
+              key={p.id}
+              className={`border rounded-xl p-5 flex justify-between items-start transition ${
+                isHighNeed
+                  ? "border-l-4 border-amber-500 bg-amber-50"
+                  : "bg-white hover:shadow-md"
+              }`}
+            >
 
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-medium">
-                    {getRiskLabel(p.riskScore)}
+              {/* 🧑 INFO */}
+              <div className="space-y-1">
+
+                <p className="text-lg font-semibold">
+                  {p.fullName}
+                </p>
+
+                <p className="text-sm text-gray-500">
+                  {p.email}
+                </p>
+
+                {/* 🔥 BADGE ALTA NECESIDAD */}
+                {isHighNeed && (
+                  <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-1 rounded mt-1">
+                    Paciente de alta necesidad
                   </span>
-                  <span>{p.riskScore}</span>
-                </div>
+                )}
 
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getRiskColor(p.riskScore)}`}
-                    style={{ width: `${p.riskScore}%` }}
-                  />
-                </div>
+                {/* 🔥 ÚLTIMO DOCUMENTO */}
+                {p.lastDoc ? (
+                  <div className="text-sm mt-2 space-y-1">
+
+                    <p>
+                      <span className="font-medium">Último estudio:</span>{" "}
+                      {p.lastDoc.docType}
+                    </p>
+
+                    <p className="text-gray-500">
+                      {p.lastDoc.facility} ·{" "}
+                      {new Date(p.lastDoc.studyDate).toLocaleDateString()}
+                    </p>
+
+                    {diffDays !== null && (
+                      <p className="text-xs text-gray-500">
+                        hace {diffDays} días
+                      </p>
+                    )}
+
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 mt-2">
+                    Sin información clínica disponible
+                  </p>
+                )}
 
               </div>
 
-              {/* 🔥 ÚLTIMO DOCUMENTO */}
-              {p.lastDoc ? (
-                <div className="text-sm mt-2 space-y-1">
-
-                  <p>
-                    <span className="font-medium">Último estudio:</span>{" "}
-                    {p.lastDoc.docType}
-                  </p>
-
-                  <p className="text-gray-500">
-                    {p.lastDoc.facility} ·{" "}
-                    {new Date(p.lastDoc.studyDate).toLocaleDateString()}
-                  </p>
-
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 mt-2">
-                  Sin documentos registrados
-                </p>
-              )}
+              {/* 🚀 ACCIÓN */}
+              <div className="pt-1">
+                <Link
+                  href={`/dashboard/patients/${p.id}`}
+                  className="text-blue-600 hover:underline text-sm"
+                >
+                  Ver expediente →
+                </Link>
+              </div>
 
             </div>
 
-            {/* 🚀 ACCIÓN */}
-            <div className="flex flex-col items-end gap-3">
-
-              <Link
-                href={`/dashboard/patients/${p.id}`}
-                className="text-blue-600 hover:underline text-sm"
-              >
-                Ver expediente →
-              </Link>
-
-            </div>
-
-          </div>
-
-        ))}
+          )
+        })}
 
         {sorted.length === 0 && (
-
           <p className="text-gray-500">
             No se encontraron pacientes.
           </p>
-
         )}
 
       </div>

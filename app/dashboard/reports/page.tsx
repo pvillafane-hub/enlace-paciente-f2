@@ -8,7 +8,6 @@ export default async function ReportsPage() {
 
   const session = await getValidatedSession()
 
-  // ✅ FIX CRÍTICO
   if (!session?.userId) {
     redirect("/?auth=required")
   }
@@ -107,76 +106,88 @@ export default async function ReportsPage() {
 
     <div className="max-w-6xl mx-auto space-y-10">
 
+      {/* HEADER */}
       <div className="bg-white border rounded-xl p-6">
-
         <h1 className="text-3xl font-bold">
           Reportes clínicos
         </h1>
 
         <p className="text-gray-500 mt-2">
-          Resumen de actividad de tus pacientes
+          Monitoreo clínico de pacientes y actividad reciente
         </p>
 
+        <p className="text-sm text-gray-400 mt-1">
+          Identifica pacientes sin actividad y revisa la información clínica más reciente.
+        </p>
       </div>
 
       {/* Estadísticas */}
-
       <div className="grid md:grid-cols-4 gap-6">
 
-        <StatCard title="Pacientes" value={patients.length} />
-        <StatCard title="Estudios" value={documents.length} />
-        <StatCard title="Solicitudes pendientes" value={pendingRequests} />
-        <StatCard title="Estado" value="Activo" />
+        <StatCard title="Pacientes activos" value={patients.length} />
+        <StatCard title="Estudios registrados" value={documents.length} />
+        <StatCard title="Accesos pendientes" value={pendingRequests} />
+        <StatCard title="Sistema operativo" value="Activo" />
 
       </div>
 
       {/* 🔴 INACTIVOS */}
-
       <div className="bg-white border rounded-xl p-6">
 
-        <h2 className="text-xl font-semibold mb-6 text-red-700">
-          Pacientes sin actividad reciente
+        <h2 className="text-xl font-semibold mb-1">
+          Pacientes que requieren seguimiento
         </h2>
+
+        <p className="text-sm text-gray-500 mb-6">
+          Pacientes sin actividad clínica reciente
+        </p>
 
         {inactivePatients.length === 0 && (
           <p className="text-gray-500">
-            Todos los pacientes están activos.
+            Todos los pacientes presentan actividad reciente.
           </p>
         )}
 
         <div className="space-y-4">
 
-          {inactivePatients.map(p => (
+          {inactivePatients.map(p => {
 
-            <div
-              key={p.id}
-              className="border rounded-lg p-4 flex justify-between items-center"
-            >
+            const label =
+              p.daysInactive >= 365
+                ? "Más de 1 año sin actividad"
+                : `Sin actividad en los últimos ${p.daysInactive} días`
 
-              <div>
-                <p className="font-semibold">{p.name}</p>
-                <p className="text-sm text-gray-500">
-                  {p.daysInactive} días sin actividad
-                </p>
+            return (
+
+              <div
+                key={p.id}
+                className="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"
+              >
+
+                <div>
+                  <p className="font-semibold">{p.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {label}
+                  </p>
+                </div>
+
+                <a
+                  href={`/dashboard/patients/${p.id}`}
+                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                >
+                  Abrir expediente
+                </a>
+
               </div>
 
-              <a
-                href={`/dashboard/patients/${p.id}`}
-                className="text-sm bg-blue-600 text-white px-3 py-1 rounded"
-              >
-                Ver paciente
-              </a>
-
-            </div>
-
-          ))}
+            )
+          })}
 
         </div>
 
       </div>
 
       {/* Actividad reciente */}
-
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="text-xl font-semibold mb-6">
@@ -185,7 +196,7 @@ export default async function ReportsPage() {
 
         {documents.length === 0 && (
           <p className="text-gray-500">
-            No hay actividad reciente.
+            No hay actividad clínica reciente.
           </p>
         )}
 
@@ -195,7 +206,7 @@ export default async function ReportsPage() {
 
             <div
               key={doc.id}
-              className="border rounded-lg p-4 flex justify-between items-center"
+              className="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"
             >
 
               <div>
@@ -203,7 +214,7 @@ export default async function ReportsPage() {
                   {doc.user.fullName}
                 </p>
                 <p className="text-sm text-gray-500">
-                  {doc.docType}
+                  Estudio: {doc.docType}
                 </p>
               </div>
 
@@ -220,7 +231,6 @@ export default async function ReportsPage() {
       </div>
 
       {/* Estudios por tipo */}
-
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="text-xl font-semibold mb-6">

@@ -3,8 +3,6 @@ import DashboardView from "./DashboardView"
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
-
-// 🔐 NUEVO
 import { getUserLicense } from "@/lib/license"
 
 export const dynamic = "force-dynamic"
@@ -41,18 +39,14 @@ export default async function Dashboard() {
 
   const passkeyEnabled = Boolean(passkey)
 
-  // 🔥 DEMO
   const isDemo = userData.email === "doctor_demo@enlace.com"
 
-  // 🔐 LICENCIA
   const license = await getUserLicense(session.userId)
 
-  // 🔐 DEV BYPASS
   const isDevBypass =
     process.env.NODE_ENV === "development" ||
     process.env.DEV_BYPASS_LICENSE === "true"
 
-  // 🔥 PAYWALL GLOBAL DOCTOR
   if (
     isDoctor &&
     !isDemo &&
@@ -62,7 +56,6 @@ export default async function Dashboard() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="bg-white border rounded-2xl p-10 text-center max-w-md shadow-sm">
-
           <h2 className="text-2xl font-bold mb-4">
             Activa tu licencia
           </h2>
@@ -71,22 +64,20 @@ export default async function Dashboard() {
             Para usar Enlace Salud necesitas una licencia activa.
           </p>
 
-          {/* 🔥 CAMBIO AQUÍ */}
           <a
             href="/api/stripe/checkout"
             className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
           >
             Activar licencia
           </a>
-
         </div>
       </div>
     )
   }
 
-  // -----------------------------
+  // =========================
   // DASHBOARD DOCTOR
-  // -----------------------------
+  // =========================
 
   if (isDoctor) {
 
@@ -99,11 +90,8 @@ export default async function Dashboard() {
             id: "1",
             fullName: "Juan Pérez",
             email: "juan@email.com",
-            createdAt: new Date(),
             documents: [
-              {
-                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 65)
-              }
+              { createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 65) }
             ]
           }
         },
@@ -112,11 +100,8 @@ export default async function Dashboard() {
             id: "2",
             fullName: "María del Carmen",
             email: "maria@email.com",
-            createdAt: new Date(),
             documents: [
-              {
-                createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20)
-              }
+              { createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20) }
             ]
           }
         },
@@ -125,7 +110,6 @@ export default async function Dashboard() {
             id: "3",
             fullName: "Ana Vélez",
             email: "ana@email.com",
-            createdAt: new Date(),
             documents: []
           }
         }
@@ -148,26 +132,24 @@ export default async function Dashboard() {
       })
     }
 
+    const now = Date.now()
+
     const patients = patientsData.map(p => {
 
       const docs = p.patient.documents
 
       let score = 0
+      let latest = null
+      let diffDays = null
 
       if (!docs || docs.length === 0) {
         score = 0
       } else {
 
-        let latestDoc = docs[0]
+        latest = docs[0]
 
-        for (let i = 1; i < docs.length; i++) {
-          if (new Date(docs[i].createdAt) > new Date(latestDoc.createdAt)) {
-            latestDoc = docs[i]
-          }
-        }
-
-        const diffDays = Math.floor(
-          (Date.now() - new Date(latestDoc.createdAt).getTime()) /
+        diffDays = Math.floor(
+          (now - new Date(latest.createdAt).getTime()) /
           (1000 * 60 * 60 * 24)
         )
 
@@ -180,14 +162,18 @@ export default async function Dashboard() {
         id: p.patient.id,
         name: p.patient.fullName,
         email: p.patient.email,
-        score
+        score,
+        latest,
+        diffDays
       }
     })
 
-    const criticalPatients = patients
-      .filter(p => p.score >= 70)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
+    patients.sort((a, b) => {
+      return new Date(b.latest?.createdAt || 0).getTime() -
+             new Date(a.latest?.createdAt || 0).getTime()
+    })
+
+    const criticalPatients = patients.filter(p => p.score >= 70)
 
     return (
       <div className="space-y-10">
@@ -196,24 +182,117 @@ export default async function Dashboard() {
           <h1 className="text-3xl font-bold">
             Dashboard del Doctor
           </h1>
+
           <p className="text-gray-500 mt-2">
-            Resumen inteligente de tus pacientes
+            Selecciona un paciente para ver su información
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          <StatCard title="Pacientes activos" value={patients.length} />
-          <StatCard title="Riesgo alto" value={criticalPatients.length} />
-          <StatCard title="Sistema" value="Monitoreando" />
+          <StatCard title="Pacientes totales" value={patients.length} />
+          <StatCard title="Con actividad reciente" value={patients.length - criticalPatients.length} />
+          <StatCard title="Pacientes de alta necesidad" value={criticalPatients.length} />
+        </div>
+
+        <div className="bg-white border rounded-xl p-6">
+
+          <h2 className="text-xl font-semibold mb-1">
+            Pacientes
+          </h2>
+
+          <p className="text-sm text-gray-500 mb-4">
+            Ordenado por actividad reciente
+          </p>
+
+          <div className="space-y-4">
+
+            {patients.map((p) => {
+
+              const isCritical = p.score >= 70
+
+              return (
+                <Link
+                  key={p.id}
+                  href={`/dashboard/patients/${p.id}`}
+                  className={`block border rounded-lg p-4 transition ${
+                    !p.latest
+                      ? "bg-gray-100 border-gray-300"
+                      : isCritical
+                      ? "border-l-4 border-yellow-600 bg-yellow-200"
+                      : "hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+
+                    <div>
+                      <p className="font-semibold">
+                        {p.name || "Paciente"}
+                      </p>
+
+                      <p className="text-sm text-gray-500">
+                        {p.email}
+                      </p>
+
+                      {isCritical && (
+                        <p className="text-yellow-900 text-xs font-medium mt-1">
+                          Requiere revisión
+                        </p>
+                      )}
+
+                      {!p.latest && (
+                        <p className="text-gray-500 text-xs mt-1">
+                          Sin información clínica aún
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-sm text-right space-y-1">
+
+                      {isCritical && (
+                        <span className="text-xs font-semibold text-yellow-900 bg-yellow-300 px-2 py-1 rounded">
+                          Alta necesidad
+                        </span>
+                      )}
+
+                      {p.latest ? (
+                        <>
+                          <p className="text-gray-500">
+                            Última actividad
+                          </p>
+                          <p className="font-medium">
+                            {new Date(p.latest.createdAt).toLocaleDateString()}
+                          </p>
+
+                          {p.diffDays !== null && (
+                            <p className="text-xs text-gray-500">
+                              hace {p.diffDays} días
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-gray-400">
+                          Sin documentos
+                        </p>
+                      )}
+
+                    </div>
+
+                  </div>
+                </Link>
+              )
+            })}
+
+          </div>
+
         </div>
 
       </div>
     )
   }
 
-  // -----------------------------
+  // =========================
   // DASHBOARD PACIENTE
-  // -----------------------------
+  // =========================
 
   const needsProfile =
     !userData.dateOfBirth ||

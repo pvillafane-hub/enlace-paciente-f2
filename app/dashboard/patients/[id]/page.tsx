@@ -154,41 +154,42 @@ export default async function PatientPage({
     (doc: any) => doc.docType === "Medicamentos"
   )
 
+  const latestDoc = patient.documents?.[0]
+
   return (
 
     <div className="max-w-5xl mx-auto space-y-8">
 
       {/* HEADER */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
-        <h1 className="text-3xl font-bold">{patient.fullName}</h1>
-        <p className="text-gray-500 mt-2">{patient.email}</p>
 
-        {isDemo && patientId === "1" && (
-          <p className="text-sm text-green-600 mt-2">
-            📌 Paciente con estudio reciente disponible
-          </p>
-        )}
+        <div className="flex justify-between items-start">
 
-        {isDemo && patientId === "2" && (
-          <p className="text-sm text-purple-600 mt-2">
-            🧪 Nuevo resultado de laboratorio disponible
-          </p>
-        )}
+          <div>
+            <h1 className="text-3xl font-bold">{patient.fullName}</h1>
+            <p className="text-gray-500 mt-1">{patient.email}</p>
 
-        {isDemo && patientId === "3" && (
-          <p className="text-sm text-gray-500 mt-2">
-            🆕 Paciente nuevo sin historial aún
-          </p>
-        )}
-      </div>
+            {latestDoc && (
+              <p className="text-sm text-gray-500 mt-2">
+                Última actividad ·{" "}
+                {new Date(latestDoc.studyDate).toLocaleDateString('es-PR')}
+              </p>
+            )}
+          </div>
 
-      {/* MENSAJE DEMO */}
-      {isDemo && (
-        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-sm">
-          👋 Bienvenido Doctor. Este es un expediente de ejemplo.  
-          Revise los documentos y vea cómo puede acceder a la información en segundos.
+          {latestDoc && (
+            <a
+              href={`/api/documents/view?id=${latestDoc.id}`}
+              target="_blank"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+            >
+              Ver último estudio
+            </a>
+          )}
+
         </div>
-      )}
+
+      </div>
 
       {/* INFO */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
@@ -210,28 +211,25 @@ export default async function PatientPage({
             <p className="text-lg font-semibold">{patient.bloodType || "No registrado"}</p>
           </div>
 
-          <div className="bg-yellow-50 p-4 rounded-xl">
+          <div className={`p-4 rounded-xl ${
+            patient.allergies
+              ? "bg-red-100 border-2 border-red-400"
+              : "bg-gray-50 border border-gray-200"
+          }`}>
             <p className="text-sm text-gray-500">Alergias</p>
-            <p className="text-lg font-semibold">{patient.allergies || "No registradas"}</p>
+            <p className="text-lg font-semibold">
+              {patient.allergies || "No registradas"}
+            </p>
           </div>
 
         </div>
       </div>
 
-      {/* MEDS */}
+      {/* MEDICAMENTOS */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
-        <h2 className="text-xl font-semibold mb-4">💊 Medicamentos</h2>
+        <h2 className="text-xl font-semibold mb-4">Medicamentos</h2>
 
-        {/* DEMO */}
-        {isDemo && patientId !== "3" && (
-          <div className="grid grid-cols-2 gap-4">
-            <img src="/demo/meds/lisinopril.jpg" className="rounded-xl border" />
-            <img src="/demo/meds/metformina.jpg" className="rounded-xl border" />
-          </div>
-        )}
-
-        {/* REAL CON MEDS */}
-        {!isDemo && meds.length > 0 && (
+        {meds.length > 0 ? (
           <div className="space-y-3">
             {meds.map((doc: any) => (
               <div
@@ -255,12 +253,9 @@ export default async function PatientPage({
               </div>
             ))}
           </div>
-        )}
-
-        {/* REAL SIN MEDS */}
-        {!isDemo && meds.length === 0 && (
+        ) : (
           <p className="text-gray-500">
-            No hay medicamentos disponibles.
+            No hay medicación registrada.
           </p>
         )}
       </div>
@@ -269,31 +264,16 @@ export default async function PatientPage({
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-6">Historial médico</h2>
 
-        <div className="mb-10">
-          <DocumentSearch
-            documents={patient.documents.map(doc => ({
-              ...doc,
-              studyDate:
-                doc.studyDate instanceof Date
-                  ? doc.studyDate.toISOString()
-                  : doc.studyDate
-            }))}
-          />
-        </div>
+        <DocumentSearch
+          documents={patient.documents.map(doc => ({
+            ...doc,
+            studyDate:
+              doc.studyDate instanceof Date
+                ? doc.studyDate.toISOString()
+                : doc.studyDate
+          }))}
+        />
       </div>
-
-      {/* BOTÓN DEMO */}
-      {isDemo && (
-        <div className="pt-6">
-          <a
-            href="https://wa.me/1XXXXXXXXXX?text=Hola,%20vi%20el%20demo%20de%20Enlace%20Salud%20y%20quiero%20más%20información"
-            target="_blank"
-            className="block text-center bg-green-600 text-white py-3 rounded-xl text-lg font-semibold hover:bg-green-700 transition"
-          >
-            💬 Quiero implementar esto en mi clínica
-          </a>
-        </div>
-      )}
 
     </div>
   )

@@ -21,7 +21,7 @@ export default function NotificationBell({
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
-  // 🔥 POLLING (cada 10s)
+  // 🔥 POLLING
   useEffect(() => {
 
     const fetchAlerts = async () => {
@@ -42,21 +42,33 @@ export default function NotificationBell({
 
   }, [])
 
-  // 🔥 RESOLVER ALERTA + REFRESH UI
+  // 🔥 RESOLVER ALERTA
   const handleResolve = async (alertId: string) => {
     try {
       await fetch(`/api/alerts/${alertId}/resolve`, {
         method: "POST"
       })
 
-      // 💥 quitar del estado inmediato
       setAlerts(prev => prev.filter(a => a.id !== alertId))
-
-      // 💥 sincronizar con layout/server
       router.refresh()
 
     } catch (e) {
       console.error("Error resolving alert", e)
+    }
+  }
+
+  // 🔥 TRADUCIR ALERTA A TEXTO CLÍNICO
+  const getAlertMessage = (type: string) => {
+
+    switch (type) {
+      case "HIGH_RISK_PATIENT":
+        return "Paciente de alta necesidad"
+
+      case "NO_ACTIVITY":
+        return "Paciente sin actividad reciente"
+
+      default:
+        return "Requiere revisión"
     }
   }
 
@@ -83,15 +95,16 @@ export default function NotificationBell({
 
         <div className="absolute right-0 mt-3 w-80 bg-white border rounded-xl shadow-lg z-50">
 
+          {/* HEADER */}
           <div className="p-4 border-b font-semibold">
-            Notificaciones
+            Alertas clínicas
           </div>
 
           <div className="max-h-80 overflow-y-auto">
 
             {alerts.length === 0 && (
               <p className="p-4 text-gray-500">
-                No hay alertas
+                No hay alertas activas
               </p>
             )}
 
@@ -102,17 +115,24 @@ export default function NotificationBell({
                 href={`/dashboard/patients/${alert.patientId}`}
                 className="block p-4 hover:bg-gray-50 border-b"
                 onClick={() => {
-                  handleResolve(alert.id) // 🔥 resolver
+                  handleResolve(alert.id)
                   setOpen(false)
                 }}
               >
 
-                <p className="font-medium">
+                {/* NOMBRE */}
+                <p className="font-semibold">
                   {alert.patientName}
                 </p>
 
-                <p className="text-sm text-gray-500">
-                  {alert.type}
+                {/* MENSAJE CLÍNICO */}
+                <p className="text-sm text-gray-600 mt-1">
+                  {getAlertMessage(alert.type)}
+                </p>
+
+                {/* ACCIÓN */}
+                <p className="text-xs text-blue-600 mt-2">
+                  Ver expediente →
                 </p>
 
               </Link>

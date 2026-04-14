@@ -65,7 +65,7 @@ async function requestAccess(formData: FormData) {
     }
   })
 
-  revalidatePath('/dashboard/request-access')
+  revalidatePath('/dashboard/requests')
 }
 
 // ==============================
@@ -107,11 +107,11 @@ export default async function RequestAccessPage() {
       {/* HEADER */}
       <div className="bg-white border rounded-xl p-6">
         <h1 className="text-2xl font-bold">
-          Solicitar acceso a paciente
+          Acceso seguro a pacientes
         </h1>
 
         <p className="text-gray-500 mt-2">
-          Busca un paciente por su email para solicitar acceso a sus documentos médicos.
+          Solicita acceso seguro a la información clínica del paciente mediante autorización.
         </p>
       </div>
 
@@ -140,18 +140,23 @@ export default async function RequestAccessPage() {
 
         </form>
 
+        {/* 🔐 HIPAA NOTE */}
+        <p className="text-xs text-gray-400 mt-3">
+          El acceso a la información clínica requiere autorización del paciente.
+        </p>
+
       </div>
 
       {/* LISTA */}
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="font-semibold mb-6">
-          Solicitudes enviadas
+          Pacientes con acceso autorizado
         </h2>
 
         {requests.length === 0 && (
           <p className="text-gray-500">
-            No has enviado solicitudes todavía.
+            No hay pacientes con acceso autorizado.
           </p>
         )}
 
@@ -161,7 +166,7 @@ export default async function RequestAccessPage() {
 
             <div
               key={req.id}
-              className="border rounded-lg p-4 flex justify-between items-start md:items-center gap-4"
+              className="border rounded-lg p-4 flex justify-between items-start md:items-center gap-4 hover:shadow-md transition"
             >
 
               {/* INFO */}
@@ -173,6 +178,12 @@ export default async function RequestAccessPage() {
                 <p className="text-sm text-gray-500">
                   {req.patient.email}
                 </p>
+
+                {req.status === "APPROVED" && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Autorizado
+                  </p>
+                )}
               </div>
 
               {/* STATUS */}
@@ -180,13 +191,13 @@ export default async function RequestAccessPage() {
 
                 {req.status === "PENDING" && (
                   <span className="bg-yellow-100 text-yellow-700 px-3 py-2 rounded-lg inline-block">
-                    Pendiente
+                    Solicitud enviada
                   </span>
                 )}
 
                 {req.status === "APPROVED" && (
                   <span className="bg-green-100 text-green-700 px-3 py-2 rounded-lg inline-block">
-                    Aprobado
+                    Acceso autorizado
                   </span>
                 )}
 
