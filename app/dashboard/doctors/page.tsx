@@ -1,12 +1,17 @@
+import { unstable_noStore as noStore } from 'next/cache'
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { revokeAccess, inviteDoctor } from "./actions"
 
+// 🔐 NUEVO
+import { getUserLicense } from "@/lib/license"
+
 export const dynamic = "force-dynamic"
 
 export default async function DoctorsPage() {
+  noStore()
 
   const session = await getValidatedSession()
 
@@ -24,7 +29,14 @@ export default async function DoctorsPage() {
     redirect("/")
   }
 
+  // 🔐 LICENCIA
+  const license = await getUserLicense(userId)
+
   const isDoctor = user.role === "DOCTOR"
+
+  console.log("ROLE:", user.role)
+  console.log("IS DOCTOR:", isDoctor)
+  console.log("LICENSE:", license)
 
   // ===================================================
   // 🧑‍🦱 PACIENTE
@@ -51,14 +63,12 @@ export default async function DoctorsPage() {
           Gestión de acceso médico
         </h1>
 
-        {/* ➕ AUTORIZAR */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
 
           <h2 className="font-semibold mb-3">
             Autorizar un doctor
           </h2>
 
-          {/* ✅ FIX AQUÍ */}
           <form
             action={inviteDoctor}
             className="flex flex-col md:flex-row gap-3"
@@ -78,7 +88,6 @@ export default async function DoctorsPage() {
 
         </div>
 
-        {/* 📩 SOLICITUDES */}
         <div>
 
           <div className="flex justify-between items-center mb-4">
@@ -137,7 +146,6 @@ export default async function DoctorsPage() {
 
         </div>
 
-        {/* 👨‍⚕️ DOCTORES */}
         <div>
 
           <h2 className="text-xl font-semibold mb-4">
@@ -170,7 +178,6 @@ export default async function DoctorsPage() {
                     </p>
                   </div>
 
-                  {/* ✅ SERVER ACTION CORRECTA */}
                   <form action={revokeAccess}>
                     <input type="hidden" name="doctorId" value={d.doctor.id} />
                     <button className="text-red-600 text-sm">
@@ -193,6 +200,36 @@ export default async function DoctorsPage() {
   // ===================================================
   // 👨‍⚕️ DOCTOR
   // ===================================================
+
+  // 🔐 BYPASS
+  const isDemo = user.email === "doctor_demo@enlace.com"
+  const isDevBypass = process.env.DEV_BYPASS_LICENSE === "true"
+
+  // 🔐 PAYWALL CORRECTO
+  if (!license && !isDemo && !isDevBypass) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="bg-white border rounded-2xl p-10 text-center max-w-md shadow-sm">
+
+          <h2 className="text-2xl font-bold mb-4">
+            Activa tu licencia
+          </h2>
+
+          <p className="text-gray-600 mb-6">
+            Para acceder a tus pacientes necesitas una licencia activa.
+          </p>
+
+          <Link
+            href="/api/stripe/checkout"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+          >
+            Activar licencia
+          </Link>
+
+        </div>
+      </div>
+    )
+  }
 
   const patientsData = await prisma.doctorPatient.findMany({
     where: {
@@ -261,13 +298,7 @@ export default async function DoctorsPage() {
   )
 }
 
-function StatCard({
-  title,
-  value
-}: {
-  title: string
-  value: number | string
-}) {
+function StatCard({ title, value }: any) {
   return (
     <div className="bg-white rounded-xl p-6 border shadow-sm">
       <p className="text-gray-500 text-sm">{title}</p>

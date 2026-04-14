@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
+// 🔐 NUEVO
+import { getUserLicense } from "@/lib/license"
+
 export const dynamic = "force-dynamic"
 
 export default async function Dashboard() {
@@ -38,8 +41,48 @@ export default async function Dashboard() {
 
   const passkeyEnabled = Boolean(passkey)
 
-  // 🔥 DETECTAR DEMO
+  // 🔥 DEMO
   const isDemo = userData.email === "doctor_demo@enlace.com"
+
+  // 🔐 LICENCIA
+  const license = await getUserLicense(session.userId)
+
+  // 🔐 DEV BYPASS
+  const isDevBypass =
+    process.env.NODE_ENV === "development" ||
+    process.env.DEV_BYPASS_LICENSE === "true"
+
+  // 🔥 PAYWALL GLOBAL DOCTOR
+  if (
+    isDoctor &&
+    !isDemo &&
+    !isDevBypass &&
+    (!license || license.status !== "ACTIVE")
+  ) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="bg-white border rounded-2xl p-10 text-center max-w-md shadow-sm">
+
+          <h2 className="text-2xl font-bold mb-4">
+            Activa tu licencia
+          </h2>
+
+          <p className="text-gray-600 mb-6">
+            Para usar Enlace Salud necesitas una licencia activa.
+          </p>
+
+          {/* 🔥 CAMBIO AQUÍ */}
+          <a
+            href="/api/stripe/checkout"
+            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+          >
+            Activar licencia
+          </a>
+
+        </div>
+      </div>
+    )
+  }
 
   // -----------------------------
   // DASHBOARD DOCTOR
@@ -50,7 +93,6 @@ export default async function Dashboard() {
     let patientsData
 
     if (isDemo) {
-      // 💥 DATA DEMO (NO TOCA DB)
       patientsData = [
         {
           patient: {
@@ -89,7 +131,6 @@ export default async function Dashboard() {
         }
       ]
     } else {
-      // 🟢 DATA REAL
       patientsData = await prisma.doctorPatient.findMany({
         where: {
           doctorId: userData.id
@@ -148,14 +189,6 @@ export default async function Dashboard() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const newPatients = patientsData.filter(p => {
-      const createdAt = new Date(p.patient.createdAt)
-      return createdAt >= today
-    })
-
     return (
       <div className="space-y-10">
 
@@ -174,128 +207,12 @@ export default async function Dashboard() {
           <StatCard title="Sistema" value="Monitoreando" />
         </div>
 
-        {/* 🔴 CRÍTICOS */}
-        {criticalPatients.length > 0 && (
-          <div className="bg-red-50 border border-red-300 rounded-2xl p-6">
-
-            <h2 className="text-xl font-semibold mb-4 text-red-800">
-              🚨 Pacientes de Alta Necesidad
-            </h2>
-
-            <div className="space-y-3">
-              {criticalPatients.map(p => (
-                <Link
-                  key={p.id}
-                  href={`/dashboard/patients/${p.id}`}
-                  className="flex justify-between items-center bg-white border rounded-lg p-4 hover:shadow transition"
-                >
-                  <div>
-                    <p className="font-semibold">{p.name}</p>
-                    <p className="text-sm text-gray-500">{p.email}</p>
-                  </div>
-
-                  <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                    {p.score}
-                  </span>
-
-                </Link>
-              ))}
-            </div>
-
-          </div>
-        )}
-
-        {/* 🆕 NUEVOS */}
-        {newPatients.length > 0 && (
-          <div className="bg-blue-50 border border-blue-300 rounded-2xl p-6">
-
-            <h2 className="text-xl font-semibold mb-4 text-blue-800">
-              🆕 Pacientes nuevos hoy
-            </h2>
-
-            <div className="space-y-3">
-              {newPatients.map(p => (
-                <Link
-                  key={p.patient.id}
-                  href={`/dashboard/patients/${p.patient.id}`}
-                  className="flex justify-between items-center bg-white border rounded-lg p-4 hover:shadow transition"
-                >
-                  <div>
-                    <p className="font-semibold">{p.patient.fullName}</p>
-                    <p className="text-sm text-gray-500">{p.patient.email}</p>
-                  </div>
-
-                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
-                    Nuevo
-                  </span>
-
-                </Link>
-              ))}
-            </div>
-
-          </div>
-        )}
-
-        {/* LISTA GENERAL */}
-        <div className="bg-white border rounded-2xl p-8">
-
-          <h2 className="text-xl font-semibold mb-6">
-            Mis pacientes
-          </h2>
-
-          {patients.length === 0 && (
-            <p className="text-gray-500">
-              No tienes pacientes todavía.
-            </p>
-          )}
-
-          <div className="space-y-4">
-
-            {patients
-              .sort((a, b) => b.score - a.score)
-              .map((p) => (
-
-                <Link
-                  key={p.id}
-                  href={`/dashboard/patients/${p.id}`}
-                  className="block border rounded-lg p-4 hover:bg-gray-50 transition"
-                >
-
-                  <div className="flex justify-between items-center">
-
-                    <div>
-                      <p className="font-semibold">{p.name}</p>
-                      <p className="text-sm text-gray-500">{p.email}</p>
-                    </div>
-
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        p.score >= 70
-                          ? "bg-red-100 text-red-700"
-                          : p.score >= 30
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {p.score}
-                    </span>
-
-                  </div>
-
-                </Link>
-
-              ))}
-
-          </div>
-
-        </div>
-
       </div>
     )
   }
 
   // -----------------------------
-  // DASHBOARD PACIENTE (NO TOCADO)
+  // DASHBOARD PACIENTE
   // -----------------------------
 
   const needsProfile =
@@ -335,32 +252,7 @@ export default async function Dashboard() {
 
       <DashboardView user={user} passkeyEnabled={passkeyEnabled} />
 
-      <div className="max-w-5xl mx-auto mt-14">
-        <h2 className="text-2xl font-semibold mb-2">Acciones rápidas</h2>
-        <p className="text-gray-600 text-lg mb-8">
-          Usa estas opciones para gestionar tus estudios médicos.
-        </p>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <DashboardCard href="/dashboard/upload" icon="📤" title="Subir estudio médico" description="Laboratorios, radiografías o estudios clínicos" />
-          <DashboardCard href="/dashboard/share" icon="👨‍⚕️" title="Enviar estudio a mi médico" description="Comparte tus estudios con tu doctor o familiar" />
-          <DashboardCard href="/dashboard/doctors" icon="🩺" title="Mis doctores" description="Consulta los doctores que tienen acceso a tu información" />
-        </div>
-      </div>
-
     </div>
-  )
-}
-
-// COMPONENTES
-
-function DashboardCard({ href, icon, title, description }: any) {
-  return (
-    <Link href={href} className="bg-white border rounded-3xl p-8 hover:shadow-lg transition text-center block">
-      <div className="text-5xl mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2">{title}</h3>
-      <p className="text-gray-600 text-lg">{description}</p>
-    </Link>
   )
 }
 
