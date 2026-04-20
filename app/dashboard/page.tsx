@@ -41,39 +41,22 @@ export default async function Dashboard() {
 
   const isDemo = userData.email === "doctor_demo@enlace.com"
 
-  const license = await getUserLicense(session.userId)
+  // ✅ SOLO buscar licencia si es doctor
+  let license = null
+  if (isDoctor) {
+    license = await getUserLicense(session.userId)
+  }
 
+  // 🔥 FIX: quitar bypass automático en dev
   const isDevBypass =
-    process.env.NODE_ENV === "development" ||
     process.env.DEV_BYPASS_LICENSE === "true"
 
-  if (
+  // ✅ lógica correcta (Opción A)
+  const licenseInactive =
     isDoctor &&
     !isDemo &&
     !isDevBypass &&
     (!license || license.status !== "ACTIVE")
-  ) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center">
-        <div className="bg-white border rounded-2xl p-10 text-center max-w-md shadow-sm">
-          <h2 className="text-2xl font-bold mb-4">
-            Activa tu licencia
-          </h2>
-
-          <p className="text-gray-600 mb-6">
-            Para usar Enlace Salud necesitas una licencia activa.
-          </p>
-
-          <a
-            href="/api/stripe/checkout"
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
-          >
-            Activar licencia
-          </a>
-        </div>
-      </div>
-    )
-  }
 
   // =========================
   // DASHBOARD DOCTOR
@@ -177,6 +160,21 @@ export default async function Dashboard() {
 
     return (
       <div className="space-y-10">
+
+        {/* 🔥 BANNER SOLO PARA DOCTOR REAL SIN LICENCIA */}
+        {licenseInactive && (
+          <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 rounded-lg flex justify-between items-center">
+            <span>
+              ⚠️ Tu licencia está inactiva. Actívala para acceder a tus pacientes.
+            </span>
+            <a
+              href="/api/stripe/checkout"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
+            >
+              Activar licencia
+            </a>
+          </div>
+        )}
 
         <div>
           <h1 className="text-3xl font-bold">
