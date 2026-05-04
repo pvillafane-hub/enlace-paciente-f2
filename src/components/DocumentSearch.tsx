@@ -13,11 +13,28 @@ export default function DocumentSearch({ documents }: any) {
       " " +
       (doc.docType || "") +
       " " +
-      (doc.facility || "")
+      (doc.facility || "") +
+      " " +
+      (doc.bodyPart || "") +
+      " " +
+      (doc.specialty || "")
 
     return text.toLowerCase().includes(query.toLowerCase())
 
   })
+
+  // 🔥 LABELS PRO
+  const specialtyLabels: any = {
+    cardiologia: "Cardiología",
+    endocrinologia: "Endocrinología",
+    nefrologia: "Nefrología",
+    hematologia_oncologia: "Hematología / Oncología",
+    urologia: "Urología",
+    reumatologia: "Reumatología",
+    neumologia: "Neumología",
+    geriatria: "Geriatría",
+    pediatria: "Pediatría",
+  }
 
   return (
 
@@ -63,7 +80,7 @@ export default function DocumentSearch({ documents }: any) {
 
               <div className="flex items-center gap-4">
 
-                {/* 🔥 PREVIEW SOLO SI ES DEMO */}
+                {/* PREVIEW SOLO SI ES DEMO */}
                 {isDemoDoc && (
                   <img
                     src={doc.filePath}
@@ -77,8 +94,26 @@ export default function DocumentSearch({ documents }: any) {
                     {doc.filename}
                   </p>
 
-                  <p className="text-sm text-gray-500">
-                    {doc.docType} · {doc.facility}
+                  <p className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
+                    
+                    <span>{doc.docType}</span>
+
+                    {/* BODY PART */}
+                    {doc.bodyPart && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full capitalize">
+                        {doc.bodyPart}
+                      </span>
+                    )}
+
+                    {/* 🔥 SPECIALTY NUEVO */}
+                    {doc.specialty && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                        {specialtyLabels[doc.specialty] || doc.specialty}
+                      </span>
+                    )}
+
+                    <span>· {doc.facility}</span>
+
                   </p>
 
                   <p className="text-xs text-gray-400">

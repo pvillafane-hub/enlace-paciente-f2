@@ -30,15 +30,17 @@ model User {
   passwordHash String
   fullName     String
   role         Role     @default(PATIENT)
-  active Boolean @default(true)
+  active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  // 🔥 NUEVO (AQUÍ MISMO)
+  qrTokens PatientQRToken[]  // 🔥 relación QR
+
+  // 🔥 INFO MÉDICA
   dateOfBirth DateTime?
   bloodType   String?
   allergies   String?
 
-  // 🆕 LICENCIAS (AÑADE ESTO)
+  // 🆕 LICENCIAS
   licenses License[]
 
   documents           Document[]
@@ -85,6 +87,8 @@ model Document {
   studyDate String
   createdAt DateTime  @default(now())
   deletedAt DateTime?
+  bodyPart String?
+  specialty String?
 
   user   User        @relation(fields: [userId], references: [id])
   shares ShareLink[]
@@ -191,6 +195,16 @@ model License {
   plan        String?  // BASIC | PRO (para futuro)
   validUntil  DateTime?
   createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PatientQRToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 }

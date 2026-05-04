@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { revokeAccess, inviteDoctor } from "./actions"
-
-// 🔐 NUEVO
 import { getUserLicense } from "@/lib/license"
 
 export const dynamic = "force-dynamic"
@@ -29,14 +27,8 @@ export default async function DoctorsPage() {
     redirect("/")
   }
 
-  // 🔐 LICENCIA
   const license = await getUserLicense(userId)
-
   const isDoctor = user.role === "DOCTOR"
-
-  console.log("ROLE:", user.role)
-  console.log("IS DOCTOR:", isDoctor)
-  console.log("LICENSE:", license)
 
   // ===================================================
   // 🧑‍🦱 PACIENTE
@@ -48,14 +40,6 @@ export default async function DoctorsPage() {
       include: { doctor: true }
     })
 
-    const requests = await prisma.medicalAccessRequest.findMany({
-      where: {
-        patientId: userId,
-        status: "PENDING"
-      },
-      include: { doctor: true }
-    })
-
     return (
       <div className="max-w-4xl mx-auto space-y-8">
 
@@ -63,103 +47,60 @@ export default async function DoctorsPage() {
           Gestión de acceso médico
         </h1>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        {/* 🔥 NUEVO: INVITAR DOCTOR */}
+        <div className="bg-white border rounded-xl p-6">
 
-          <h2 className="font-semibold mb-3">
-            Autorizar un doctor
+          <h2 className="text-lg font-semibold mb-4">
+            Añadir doctor
           </h2>
 
-          <form
-            action={inviteDoctor}
-            className="flex flex-col md:flex-row gap-3"
-          >
+          <form action={inviteDoctor} className="flex flex-col md:flex-row gap-3">
+
             <input
-              name="email"
               type="email"
+              name="email"
               placeholder="Email del doctor"
               required
-              className="flex-1 border rounded-lg px-3 py-3"
+              className="border rounded-lg px-4 py-3 flex-1"
             />
 
-            <button className="bg-blue-600 text-white px-4 py-3 rounded-lg w-full md:w-auto">
-              Autorizar
+            <button
+              className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700"
+            >
+              Enviar solicitud
             </button>
+
           </form>
 
-        </div>
+          <p className="text-xs text-gray-400 mt-3">
+            El doctor recibirá una solicitud para acceder a su información médica.
+          </p>
 
-        <div>
-
-          <div className="flex justify-between items-center mb-4">
-
-            <h2 className="text-xl font-semibold">
-              Solicitudes de acceso
-            </h2>
-
+          {/* 🔥 LINK QR */}
+          <div className="mt-4">
             <Link
-              href="/dashboard/doctors/requests"
-              className="text-sm text-blue-600"
+              href="/dashboard/qr"
+              className="text-blue-600 text-sm underline"
             >
-              Ver todas
+              Mostrar código al doctor
             </Link>
-
-          </div>
-
-          {requests.length === 0 && (
-            <p className="text-gray-500">
-              No tienes solicitudes pendientes.
-            </p>
-          )}
-
-          <div className="space-y-4">
-
-            {requests.map(r => {
-              if (!r.doctor) return null
-
-              return (
-                <div
-                  key={r.id}
-                  className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex justify-between items-center"
-                >
-
-                  <div>
-                    <p className="font-semibold">
-                      {r.doctor.fullName}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {r.doctor.email}
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/dashboard/doctors/requests"
-                    className="text-sm bg-green-600 text-white px-3 py-1 rounded"
-                  >
-                    Revisar
-                  </Link>
-
-                </div>
-              )
-            })}
-
           </div>
 
         </div>
 
+        {/* DOCTORES CON ACCESO */}
         <div>
-
           <h2 className="text-xl font-semibold mb-4">
             Doctores con acceso
           </h2>
 
           {doctors.length === 0 && (
             <p className="text-gray-500">
-              No tienes doctores autorizados.
+              No tienes doctores con acceso todavía.
             </p>
           )}
 
           <div className="space-y-4">
-
             {doctors.map(d => {
               if (!d.doctor) return null
 
@@ -168,7 +109,6 @@ export default async function DoctorsPage() {
                   key={d.doctor.id}
                   className="bg-white border rounded-xl p-4 flex justify-between items-center"
                 >
-
                   <div>
                     <p className="font-semibold">
                       {d.doctor.fullName}
@@ -184,11 +124,9 @@ export default async function DoctorsPage() {
                       Revocar acceso
                     </button>
                   </form>
-
                 </div>
               )
             })}
-
           </div>
 
         </div>
@@ -201,43 +139,17 @@ export default async function DoctorsPage() {
   // 👨‍⚕️ DOCTOR
   // ===================================================
 
-  // 🔐 BYPASS
-  const isDemo = user.email === "doctor_demo@enlace.com"
-  const isDevBypass = process.env.DEV_BYPASS_LICENSE === "true"
-
-  // 🔐 PAYWALL SOLO DOCTOR
-  if (!license && !isDemo && !isDevBypass) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="bg-white border rounded-2xl p-10 text-center max-w-md shadow-sm">
-
-          <h2 className="text-2xl font-bold mb-4">
-            Activa tu licencia
-          </h2>
-
-          <p className="text-gray-600 mb-6">
-            Para acceder a tus pacientes necesitas una licencia activa.
-          </p>
-
-          <a
-            href="/api/stripe/checkout"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold inline-block"
-          >
-            Activar licencia
-          </a>
-
-        </div>
-      </div>
-    )
-  }
-
-  // ================= DOCTOR NORMAL =================
-
   const patientsData = await prisma.doctorPatient.findMany({
     where: { doctorId: userId },
     include: {
       patient: {
-        include: { documents: true }
+        include: {
+          documents: {
+            orderBy: {
+              createdAt: "desc"
+            }
+          }
+        }
       }
     }
   })
@@ -248,6 +160,75 @@ export default async function DoctorsPage() {
       <h1 className="text-3xl font-bold">
         Dashboard del Doctor
       </h1>
+
+      {patientsData.length === 0 && (
+        <p className="text-gray-500">
+          No tienes pacientes asignados.
+        </p>
+      )}
+
+      <div className="space-y-8">
+
+        {patientsData.map((p) => {
+          if (!p.patient) return null
+
+          return (
+            <div
+              key={p.patient.id}
+              className="bg-white border rounded-2xl p-6 shadow-sm"
+            >
+
+              <h2 className="text-xl font-semibold mb-4">
+                {p.patient.fullName}
+              </h2>
+
+              {p.patient.documents.length === 0 ? (
+                <p className="text-gray-500">
+                  Este paciente no tiene documentos.
+                </p>
+              ) : (
+                <div className="space-y-3">
+
+                  {p.patient.documents.map((doc) => {
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="border rounded-lg p-4"
+                      >
+
+                        <p className="font-semibold">
+                          {doc.docType}
+                        </p>
+
+                        {doc.bodyPart && (
+                          <div className="mt-1">
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded-full capitalize">
+                              {doc.bodyPart}
+                            </span>
+                          </div>
+                        )}
+
+                        <p className="text-sm text-gray-500">
+                          {doc.facility}
+                        </p>
+
+                        <p className="text-xs text-gray-400">
+                          {doc.studyDate}
+                        </p>
+
+                      </div>
+                    )
+                  })}
+
+                </div>
+              )}
+
+            </div>
+          )
+        })}
+
+      </div>
 
     </div>
   )

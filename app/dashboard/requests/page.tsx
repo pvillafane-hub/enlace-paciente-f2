@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import QRScannerClient from './QRScannerClient'
 
 // ==============================
 // 🔐 SERVER ACTION
@@ -139,6 +140,17 @@ export default async function RequestAccessPage() {
           </button>
 
         </form>
+
+        {/* 🔥 NUEVO: QR SCANNER */}
+        <div className="mt-6 border-t pt-6">
+
+          <h3 className="font-semibold mb-3">
+            Escanear código del paciente
+          </h3>
+
+          <QRScannerClient />
+
+        </div>
 
         {/* 🔐 HIPAA NOTE */}
         <p className="text-xs text-gray-400 mt-3">

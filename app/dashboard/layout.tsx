@@ -101,6 +101,14 @@ export default async function DashboardLayout({
                 <Link href="/dashboard/security">
                   Seguridad
                 </Link>
+
+                {/* 🔥 NUEVO TAB QR */}
+                <Link
+                  href="/dashboard/qr"
+                  className="font-semibold text-blue-700"
+                >
+                  Mostrar código
+                </Link>
               </>
             )}
 

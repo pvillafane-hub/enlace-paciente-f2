@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import ActivitySearch from "./ActivitySearch"
 
 export const dynamic = "force-dynamic"
 
@@ -187,46 +188,20 @@ export default async function ReportsPage() {
 
       </div>
 
-      {/* Actividad reciente */}
+      {/* 🔍 Actividad reciente CON SEARCH */}
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="text-xl font-semibold mb-6">
           Actividad reciente
         </h2>
 
-        {documents.length === 0 && (
+        {documents.length === 0 ? (
           <p className="text-gray-500">
             No hay actividad clínica reciente.
           </p>
+        ) : (
+          <ActivitySearch documents={documents} />
         )}
-
-        <div className="space-y-4">
-
-          {documents.map(doc => (
-
-            <div
-              key={doc.id}
-              className="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"
-            >
-
-              <div>
-                <p className="font-semibold">
-                  {doc.user.fullName}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Estudio: {doc.docType}
-                </p>
-              </div>
-
-              <div className="text-sm text-gray-400">
-                {new Date(doc.createdAt).toLocaleDateString()}
-              </div>
-
-            </div>
-
-          ))}
-
-        </div>
 
       </div>
 
