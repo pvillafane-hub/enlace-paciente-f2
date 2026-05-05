@@ -20,32 +20,50 @@ export default function QRScannerClient() {
 
     scanner.render(
       async (decodedText: string) => {
+
+        console.log("QR leído:", decodedText)
+
         try {
 
           setLoading(true)
           setError("")
 
+          if (!decodedText.includes("/qr/")) {
+            throw new Error("Formato inválido")
+          }
+
           const token = decodedText.split("/qr/")[1]
 
-          const res = await fetch(`/api/qr/lookup?token=${token}`)
+          // ✅ FIX: POST correcto
+          const res = await fetch("/api/qr/lookup", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ token })
+          })
 
           if (!res.ok) {
-            throw new Error("QR inválido")
+            throw new Error("QR inválido o expirado")
           }
 
           const data = await res.json()
 
-          setScannedPatient(data)
+          // ✅ FIX: usar data.patient
+          setScannedPatient(data.patient)
 
           scanner.clear()
 
         } catch (e) {
-          setError("No se pudo leer el código")
+          console.error(e)
+          setError("No se pudo procesar el código")
         } finally {
           setLoading(false)
         }
       },
-      () => {}
+      () => {
+        // ❌ NO mostrar error aquí
+      }
     )
 
     scannerRef.current = scanner
