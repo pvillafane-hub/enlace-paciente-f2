@@ -25,8 +25,14 @@ export async function GET() {
     }
   })
 
+  // 🌐 URL base segura con fallback
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "http://localhost:3000"
+
   return NextResponse.json({
     token,
-    url: `${process.env.NEXT_PUBLIC_APP_URL}/qr/${token}`
+    url: `${baseUrl}/qr/${token}`
   })
 }

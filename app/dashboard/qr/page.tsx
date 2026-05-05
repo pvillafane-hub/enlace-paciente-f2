@@ -35,7 +35,15 @@ export default function QRPage() {
 
       {qrUrl && (
         <div className="flex justify-center">
-          <QRCodeCanvas value={qrUrl} size={220} />
+          <QRCodeCanvas
+          
+            value={qrUrl}
+            size={260}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="H"
+            marginSize={4}
+         />
         </div>
       )}
 
