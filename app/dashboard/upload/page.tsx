@@ -1,19 +1,23 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useRef } from 'react'
 import imageCompression from "browser-image-compression"
 
 export default function UploadPage() {
 
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 🔥 NUEVO: paciente destino cuando doctor/staff sube desde el perfil del paciente
+  const patientId = searchParams?.get("patientId") || null
 
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [bodyPart, setBodyPart] = useState("")
-  const [docType, setDocType] = useState("") 
+  const [docType, setDocType] = useState("")
   const [specialty, setSpecialty] = useState("")
 
   const [errors, setErrors] = useState<{
@@ -73,6 +77,11 @@ export default function UploadPage() {
       formData.set('file', selectedFile)
     }
 
+    // 🔥 NUEVO: enviar patientId al endpoint si viene desde /dashboard/upload?patientId=...
+    if (patientId) {
+      formData.set('patientId', patientId)
+    }
+
     const docType = formData.get('docType') as string
     const facility = formData.get('facility') as string
     const studyDate = formData.get('studyDate')
@@ -81,13 +90,12 @@ export default function UploadPage() {
 
     const isImaging =
       docType === "Radiografia" || docType === "Imagenes"
-    
+
     const isLab = docType === "Laboratorio"
-     
+
     if (isLab && !specialty) {
-       newErrors.specialty = "Seleccione la especialidad médica."
+      newErrors.specialty = "Seleccione la especialidad médica."
     }
-    
 
     if (isImaging && !bodyPart) {
       newErrors.docType = "Seleccione la parte del cuerpo del estudio."
@@ -120,6 +128,7 @@ export default function UploadPage() {
       if (bodyPart) {
         formData.append('bodyPart', bodyPart)
       }
+
       if (specialty) {
         formData.append('specialty', specialty)
       }
@@ -140,7 +149,13 @@ export default function UploadPage() {
         setSaved(true)
 
         setTimeout(() => {
-          router.push('/dashboard')
+          // 🔥 NUEVO: si subió documento para paciente, volver al perfil del paciente
+          if (patientId) {
+            router.push(`/dashboard/patients/${patientId}`)
+          } else {
+            router.push('/dashboard')
+          }
+
           router.refresh()
         }, 1500)
 
@@ -165,12 +180,31 @@ export default function UploadPage() {
       <div className="bg-white rounded-2xl p-8 shadow-md">
 
         <h2 className="text-3xl font-bold mb-4">
-          Subir estudio médico
+          {patientId ? "Subir documento del paciente" : "Subir estudio médico"}
         </h2>
 
         <p className="text-gray-600 text-lg mb-6">
-          Puede subir laboratorios, radiografías, medicamentos, vacunas o referidos médicos.
+          {patientId
+            ? "Este documento se guardará directamente en el expediente del paciente seleccionado."
+            : "Puede subir laboratorios, radiografías, medicamentos, vacunas o referidos médicos."}
         </p>
+
+        {patientId && (
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-800">
+            <p className="font-semibold">
+              Modo clínico activo
+            </p>
+            <p className="text-sm mt-1">
+              Está subiendo este documento en nombre del paciente.
+            </p>
+          </div>
+        )}
+
+        {saved && (
+          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+            Documento guardado correctamente.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
 
@@ -181,14 +215,32 @@ export default function UploadPage() {
             📄 Archivo
 
             <input
+              ref={fileRef}
               type="file"
+              name="file"
               accept="image/*,.pdf"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0]
                 if (!file) return
 
-                setSelectedFile(file)
-                setFileName(file.name)
+                try {
+                  if (file.type.startsWith("image/")) {
+                    const compressedFile = await imageCompression(file, {
+                      maxSizeMB: 1,
+                      maxWidthOrHeight: 1600,
+                      useWebWorker: true,
+                    })
+
+                    setSelectedFile(compressedFile)
+                    setFileName(compressedFile.name || file.name)
+                  } else {
+                    setSelectedFile(file)
+                    setFileName(file.name)
+                  }
+                } catch {
+                  setSelectedFile(file)
+                  setFileName(file.name)
+                }
               }}
               className="mt-3 block w-full"
             />
@@ -210,6 +262,7 @@ export default function UploadPage() {
             🧾 Tipo de estudio
 
             <select
+              ref={docTypeRef}
               name="docType"
               value={docType}
               onChange={(e) => {
@@ -217,7 +270,6 @@ export default function UploadPage() {
                 setDocType(value)
                 validateField('docType', value)
 
-                // 🔥 limpiar bodyPart si cambia
                 if (value !== "Radiografia" && value !== "Imagenes") {
                   setBodyPart("")
                 }
@@ -248,7 +300,7 @@ export default function UploadPage() {
 
           </label>
 
-          {/* 🔥 BODY PART (FUERA DEL SELECT) */}
+          {/* BODY PART */}
 
           {(docType === "Radiografia" || docType === "Imagenes") && (
             <div>
@@ -290,39 +342,39 @@ export default function UploadPage() {
           )}
 
           {docType === "Laboratorio" && (
-           <div>
+            <div>
 
-             <p className="text-lg font-semibold mt-4">
+              <p className="text-lg font-semibold mt-4">
                 Especialidad médica
-             </p>
+              </p>
 
-             <select
-               name="specialty"
-               value={specialty}
-               onChange={(e) => setSpecialty(e.target.value)}
-               className="mt-2 w-full p-4 text-lg border rounded-lg"
-             >
-               <option value="">Seleccione especialidad</option>
+              <select
+                name="specialty"
+                value={specialty}
+                onChange={(e) => setSpecialty(e.target.value)}
+                className="mt-2 w-full p-4 text-lg border rounded-lg"
+              >
+                <option value="">Seleccione especialidad</option>
 
-               <option value="cardiologia">Cardiología</option>
-               <option value="endocrinologia">Endocrinología</option>
-               <option value="nefrologia">Nefrología</option>
-               <option value="hematologia_oncologia">Hematología / Oncología</option>
-               <option value="urologia">Urología</option>
-               <option value="reumatologia">Reumatología</option>
-               <option value="neumologia">Neumología</option>
-               <option value="geriatria">Geriatría</option>
-               <option value="pediatria">Pediatría</option>
+                <option value="cardiologia">Cardiología</option>
+                <option value="endocrinologia">Endocrinología</option>
+                <option value="nefrologia">Nefrología</option>
+                <option value="hematologia_oncologia">Hematología / Oncología</option>
+                <option value="urologia">Urología</option>
+                <option value="reumatologia">Reumatología</option>
+                <option value="neumologia">Neumología</option>
+                <option value="geriatria">Geriatría</option>
+                <option value="pediatria">Pediatría</option>
 
-             </select>
+              </select>
 
-             {errors.specialty && (
-               <p className="mt-2 text-red-700 font-semibold">
-                 ⚠ {errors.specialty}
-               </p>
-             )}
+              {errors.specialty && (
+                <p className="mt-2 text-red-700 font-semibold">
+                  ⚠ {errors.specialty}
+                </p>
+              )}
 
-           </div>
+            </div>
           )}
 
           {/* HOSPITAL */}
@@ -332,6 +384,7 @@ export default function UploadPage() {
             🏥 Hospital o clínica
 
             <input
+              ref={facilityRef}
               type="text"
               name="facility"
               onChange={(e) => validateField('facility', e.target.value)}
@@ -353,6 +406,7 @@ export default function UploadPage() {
             📅 Fecha del estudio
 
             <input
+              ref={dateRef}
               type="date"
               name="studyDate"
               onChange={(e) => validateField('studyDate', e.target.value)}
@@ -370,7 +424,7 @@ export default function UploadPage() {
           <button
             type="submit"
             disabled={loading}
-            className="p-4 rounded-xl text-2xl font-semibold w-full bg-blue-600 text-white"
+            className="p-4 rounded-xl text-2xl font-semibold w-full bg-blue-600 text-white disabled:opacity-50"
           >
             {loading ? 'Guardando...' : 'Guardar estudio médico'}
           </button>

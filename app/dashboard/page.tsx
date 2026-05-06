@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { getUserLicense } from "@/lib/license"
+import ActivatePatientBox from "@/components/staff/ActivatePatientBox"
 
 export const dynamic = "force-dynamic"
 
@@ -32,6 +33,8 @@ export default async function Dashboard() {
 
   const role = userData.role
   const isDoctor = role === "DOCTOR"
+  const isStaff = role === "STAFF"
+  const isClinicUser = isDoctor || isStaff
 
   const passkey = await prisma.authMethod.findFirst({
     where: { userId: session.userId }
@@ -41,17 +44,14 @@ export default async function Dashboard() {
 
   const isDemo = userData.email === "doctor_demo@enlace.com"
 
-  // ✅ SOLO buscar licencia si es doctor
   let license = null
   if (isDoctor) {
     license = await getUserLicense(session.userId)
   }
 
-  // 🔥 FIX: quitar bypass automático en dev
   const isDevBypass =
     process.env.DEV_BYPASS_LICENSE === "true"
 
-  // ✅ lógica correcta (Opción A)
   const licenseInactive =
     isDoctor &&
     !isDemo &&
@@ -59,10 +59,27 @@ export default async function Dashboard() {
     (!license || license.status !== "ACTIVE")
 
   // =========================
-  // DASHBOARD DOCTOR
+  // DASHBOARD DOCTOR / STAFF
   // =========================
 
-  if (isDoctor) {
+  if (isClinicUser) {
+
+    let clinicDoctorId = userData.id
+
+    if (isStaff) {
+      const staffRelation = await prisma.clinicStaff.findFirst({
+        where: {
+          staffId: userData.id,
+          active: true
+        }
+      })
+
+      if (!staffRelation) {
+        redirect("/")
+      }
+
+      clinicDoctorId = staffRelation.doctorId
+    }
 
     let patientsData
 
@@ -100,7 +117,7 @@ export default async function Dashboard() {
     } else {
       patientsData = await prisma.doctorPatient.findMany({
         where: {
-          doctorId: userData.id
+          doctorId: clinicDoctorId
         },
         include: {
           patient: {
@@ -161,7 +178,6 @@ export default async function Dashboard() {
     return (
       <div className="space-y-10">
 
-        {/* 🔥 BANNER SOLO PARA DOCTOR REAL SIN LICENCIA */}
         {licenseInactive && (
           <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 rounded-lg flex justify-between items-center">
             <span>
@@ -178,7 +194,7 @@ export default async function Dashboard() {
 
         <div>
           <h1 className="text-3xl font-bold">
-            Dashboard del Doctor
+            {isStaff ? "Dashboard del Staff" : "Dashboard del Doctor"}
           </h1>
 
           <p className="text-gray-500 mt-2">
@@ -191,6 +207,8 @@ export default async function Dashboard() {
           <StatCard title="Con actividad reciente" value={patients.length - criticalPatients.length} />
           <StatCard title="Pacientes de alta necesidad" value={criticalPatients.length} />
         </div>
+
+        <ActivatePatientBox />
 
         <div className="bg-white border rounded-xl p-6">
 

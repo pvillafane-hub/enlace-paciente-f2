@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import DocumentSearch from '@/components/DocumentSearch'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
@@ -15,7 +16,6 @@ export default async function PatientPage({
     redirect('/?auth=required')
   }
 
-  const doctorId = session.userId
   const { id: patientId } = await params
 
   if (!patientId) {
@@ -30,7 +30,30 @@ export default async function PatientPage({
     redirect('/dashboard')
   }
 
+  const isDoctor = user.role === "DOCTOR"
+  const isStaff = user.role === "STAFF"
   const isDemo = user.email === "doctor_demo@enlace.com"
+
+  let doctorId = user.id
+
+  if (isStaff) {
+    const staffRelation = await prisma.clinicStaff.findFirst({
+      where: {
+        staffId: user.id,
+        active: true
+      }
+    })
+
+    if (!staffRelation) {
+      redirect('/dashboard')
+    }
+
+    doctorId = staffRelation.doctorId
+  }
+
+  if (!isDoctor && !isStaff) {
+    redirect('/dashboard')
+  }
 
   if (!isDemo) {
     const access = await prisma.doctorPatient.findFirst({
@@ -191,6 +214,24 @@ export default async function PatientPage({
 
       </div>
 
+      {/* SUBIR DOCUMENTO */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border">
+        <h2 className="text-xl font-semibold mb-2">
+          Subir documento para este paciente
+        </h2>
+
+        <p className="text-sm text-gray-500 mb-4">
+          Añade laboratorios, radiografías, recetas u otros documentos al expediente del paciente.
+        </p>
+
+        <Link
+          href={`/dashboard/upload?patientId=${patient.id}`}
+          className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
+        >
+          Subir documento
+        </Link>
+      </div>
+
       {/* INFO */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-4">Información del paciente</h2>
@@ -265,7 +306,7 @@ export default async function PatientPage({
         <h2 className="text-xl font-semibold mb-6">Historial médico</h2>
 
         <DocumentSearch
-          documents={patient.documents.map(doc => ({
+          documents={patient.documents.map((doc: any) => ({
             ...doc,
             studyDate:
               doc.studyDate instanceof Date

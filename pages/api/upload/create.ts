@@ -42,11 +42,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const session = await prisma.session.findUnique({
         where: { id: sessionId },
+        include: {
+          user: true,
+        },
       })
 
-      if (!session?.userId) {
+      if (!session?.userId || !session.user) {
         return res.status(401).json({ error: "No autorizado" })
       }
+
+      const currentUser = session.user
 
       // 🔹 NORMALIZAR CAMPOS
       const getValue = (f: any) => Array.isArray(f) ? f[0] : f
@@ -55,14 +60,73 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const facility = getValue(fields.facility)
       const studyDate = getValue(fields.studyDate)
       const bodyPart = getValue(fields.bodyPart)
-      const specialty = getValue(fields.specialty) // 🔥 NUEVO
+      const specialty = getValue(fields.specialty)
+      const patientId = getValue(fields.patientId) // 🔥 NUEVO: paciente destino
 
       const normalizedDocType = docType?.toLowerCase()
       const normalizedBodyPart = bodyPart?.toLowerCase().trim()
       const normalizedSpecialty = specialty?.toLowerCase().trim()
 
-      // 🔹 VALIDACIÓN CLÍNICA
+      // 🔐 DETERMINAR A QUIÉN SE LE SUBE EL DOCUMENTO
+      let targetUserId = session.userId
 
+      if (patientId && typeof patientId === "string") {
+
+        const isDoctor = currentUser.role === "DOCTOR"
+        const isStaff = currentUser.role === "STAFF"
+
+        if (!isDoctor && !isStaff) {
+          return res.status(403).json({
+            error: "No autorizado para subir documentos a otro paciente",
+          })
+        }
+
+        let doctorId = currentUser.id
+
+        if (isStaff) {
+          const staffRelation = await prisma.clinicStaff.findFirst({
+            where: {
+              staffId: currentUser.id,
+              active: true,
+            },
+          })
+
+          if (!staffRelation) {
+            return res.status(403).json({
+              error: "Este staff no está asignado a un doctor activo",
+            })
+          }
+
+          doctorId = staffRelation.doctorId
+        }
+
+        const access = await prisma.doctorPatient.findFirst({
+          where: {
+            doctorId,
+            patientId,
+          },
+        })
+
+        if (!access) {
+          return res.status(403).json({
+            error: "No autorizado para subir documentos a este paciente",
+          })
+        }
+
+        const patient = await prisma.user.findUnique({
+          where: { id: patientId },
+        })
+
+        if (!patient || patient.role !== "PATIENT" || !patient.active) {
+          return res.status(400).json({
+            error: "Paciente inválido o inactivo",
+          })
+        }
+
+        targetUserId = patientId
+      }
+
+      // 🔹 VALIDACIÓN CLÍNICA
       const isImaging =
         normalizedDocType === "radiografia" ||
         normalizedDocType === "imagenes"
@@ -139,18 +203,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // 💾 DB
       const document = await prisma.document.create({
         data: {
-          userId: session.userId,
+          userId: targetUserId, // 🔥 FIX CLAVE: paciente destino, no siempre doctor
           docType: docType as string,
           facility: facility as string,
           studyDate: studyDate as string,
           filename: file.originalFilename || 'documento',
           filePath: fileKey,
           bodyPart: normalizedBodyPart || null,
-          specialty: normalizedSpecialty || null, // 🔥 FIX CLAVE
+          specialty: normalizedSpecialty || null,
         },
       })
 
-      return res.status(200).json({ success: true, document })
+      return res.status(200).json({
+        success: true,
+        document,
+        uploadedForUserId: targetUserId,
+      })
 
     } catch (error) {
 

@@ -59,7 +59,12 @@ model User {
   doctorAlerts  MedicalAlert[] @relation("DoctorAlerts")
   patientAlerts MedicalAlert[] @relation("PatientAlerts")
 
+  staffMembers ClinicStaff[] @relation("DoctorStaff")
+  staffOf      ClinicStaff[] @relation("StaffUser")
+  
   passwordChangedAt DateTime?
+
+  
 }
 
 model AuthMethod {
@@ -184,6 +189,7 @@ model MedicalAlert {
 enum Role {
   ADMIN
   DOCTOR
+  STAFF
   PATIENT
 }
 
@@ -207,4 +213,22 @@ model PatientQRToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model ClinicStaff {
+  id        String   @id @default(cuid())
+
+  doctorId String
+  staffId  String
+
+  role      String   @default("ASSISTANT")
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor User @relation("DoctorStaff", fields: [doctorId], references: [id])
+  staff  User @relation("StaffUser", fields: [staffId], references: [id])
+
+  @@unique([doctorId, staffId])
 }

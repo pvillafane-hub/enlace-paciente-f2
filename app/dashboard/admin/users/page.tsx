@@ -2,45 +2,42 @@ import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { Role } from "@prisma/client"
-import { toggleUserActive, changeUserRole } from "app/dashboard/admin/users/actions"
+import {
+  toggleUserActive,
+  changeUserRole,
+  assignUserAsStaff,
+} from "app/dashboard/admin/users/actions"
 
 export default async function AdminUsersPage({
   searchParams,
 }: {
   searchParams: Promise<{ query?: string }>
 }) {
-
   const params = await searchParams
   const query = params?.query || ""
 
   const session = await getValidatedSession()
 
-  if (!session) {
-    redirect("/?auth=required")
-  }
-
-  // 🔥 FIX CRÍTICO
-  if (!session.userId) {
+  if (!session?.userId) {
     redirect("/?auth=required")
   }
 
   const userId = session.userId
 
   const user = await prisma.user.findUnique({
-    where: { id: userId }
+    where: { id: userId },
   })
 
   if (!user || user.role !== Role.ADMIN) {
     redirect("/dashboard")
   }
 
-  // 🔥 NORMALIZAR QUERY
   const normalizedQuery = query.trim().toLowerCase()
 
-  // 🔥 MAPEO DE ROLE
   const roleMap: Record<string, Role> = {
     patient: Role.PATIENT,
     doctor: Role.DOCTOR,
+    staff: Role.STAFF,
     admin: Role.ADMIN,
   }
 
@@ -74,8 +71,36 @@ export default async function AdminUsersPage({
           ],
         }
       : {},
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
   })
+
+  const doctors = await prisma.user.findMany({
+    where: {
+      role: Role.DOCTOR,
+      active: true,
+    },
+    orderBy: {
+      fullName: "asc",
+    },
+  })
+
+  // 🔥 Relación STAFF → DOCTOR
+  // Lo hacemos separado para no depender del include staffAssignments en User.
+  const staffRelations = await prisma.clinicStaff.findMany({
+    where: {
+      active: true,
+    },
+    include: {
+      doctor: true,
+    },
+  })
+
+  const assignedDoctorByStaffId = new Map(
+    staffRelations.map((relation) => [
+      relation.staffId,
+      relation.doctor,
+    ])
+  )
 
   return (
     <div className="space-y-6">
@@ -84,7 +109,7 @@ export default async function AdminUsersPage({
         Administración de Usuarios
       </h1>
 
-      {/* 🔍 SEARCH */}
+      {/* BUSCAR */}
       <form method="GET">
         <input
           type="text"
@@ -104,6 +129,7 @@ export default async function AdminUsersPage({
               <th className="p-3">Email</th>
               <th className="p-3">Nombre</th>
               <th className="p-3">Rol</th>
+              <th className="p-3">Doctor asignado</th>
               <th className="p-3">Creado</th>
               <th className="p-3">Estado</th>
               <th className="p-3">Acción</th>
@@ -114,73 +140,163 @@ export default async function AdminUsersPage({
 
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-gray-500">
+                <td colSpan={7} className="p-6 text-center text-gray-500">
                   No se encontraron usuarios
                 </td>
               </tr>
             )}
 
-            {users.map((u) => (
-              <tr key={u.id} className="border-b hover:bg-gray-50">
+            {users.map((u) => {
+              const assignedDoctor =
+                assignedDoctorByStaffId.get(u.id) || null
 
-                <td className="p-3">{u.email}</td>
+              return (
+                <tr key={u.id} className="border-b hover:bg-gray-50">
 
-                <td className="p-3">{u.fullName}</td>
+                  <td className="p-3">
+                    {u.email}
+                  </td>
 
-                <td className="p-3 space-y-2">
+                  <td className="p-3">
+                    {u.fullName}
+                  </td>
 
-                  <div className="font-medium">{u.role}</div>
+                  <td className="p-3 space-y-2">
 
-                  {u.role !== "ADMIN" && (
-                    <div className="flex gap-2 flex-wrap">
-
-                      {u.role !== "PATIENT" && (
-                        <form action={changeUserRole.bind(null, u.id, "PATIENT")}>
-                          <button className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
-                            Hacer Paciente
-                          </button>
-                        </form>
-                      )}
-
-                      {u.role !== "DOCTOR" && (
-                        <form action={changeUserRole.bind(null, u.id, "DOCTOR")}>
-                          <button className="text-xs bg-blue-100 px-2 py-1 rounded hover:bg-blue-200">
-                            Hacer Doctor
-                          </button>
-                        </form>
-                      )}
-
+                    <div className="font-medium">
+                      {u.role}
                     </div>
-                  )}
 
-                </td>
+                    {u.role !== Role.ADMIN && (
+                      <div className="space-y-2">
 
-                <td className="p-3">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
+                        <div className="flex gap-2 flex-wrap">
 
-                <td className="p-3">
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      u.active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {u.active ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
+                          {u.role !== Role.PATIENT && (
+                            <form action={changeUserRole.bind(null, u.id, "PATIENT")}>
+                              <button className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
+                                Hacer Paciente
+                              </button>
+                            </form>
+                          )}
 
-                <td className="p-3 space-y-2">
-                  <form action={toggleUserActive.bind(null, u.id)}>
-                    <button className="text-blue-600 underline">
-                      {u.active ? "Desactivar" : "Activar"}
-                    </button>
-                  </form>
-                </td>
+                          {u.role !== Role.DOCTOR && (
+                            <form action={changeUserRole.bind(null, u.id, "DOCTOR")}>
+                              <button className="text-xs bg-blue-100 px-2 py-1 rounded hover:bg-blue-200">
+                                Hacer Doctor
+                              </button>
+                            </form>
+                          )}
 
-              </tr>
-            ))}
+                        </div>
+
+                        {u.role !== Role.STAFF && (
+                          <form
+                            action={assignUserAsStaff.bind(null, u.id)}
+                            className="flex gap-2 items-center flex-wrap"
+                          >
+                            <select
+                              name="doctorId"
+                              required
+                              className="text-xs border rounded px-2 py-1"
+                              defaultValue=""
+                            >
+                              <option value="">Seleccionar doctor</option>
+
+                              {doctors.map((doctor) => (
+                                <option key={doctor.id} value={doctor.id}>
+                                  {doctor.fullName} · {doctor.email}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button className="text-xs bg-purple-100 px-2 py-1 rounded hover:bg-purple-200">
+                              Hacer Staff
+                            </button>
+                          </form>
+                        )}
+
+                        {u.role === Role.STAFF && (
+                          <form
+                            action={assignUserAsStaff.bind(null, u.id)}
+                            className="flex gap-2 items-center flex-wrap"
+                          >
+                            <select
+                              name="doctorId"
+                              required
+                              className="text-xs border rounded px-2 py-1"
+                              defaultValue={assignedDoctor?.id || ""}
+                            >
+                              <option value="">Seleccionar doctor</option>
+
+                              {doctors.map((doctor) => (
+                                <option key={doctor.id} value={doctor.id}>
+                                  {doctor.fullName} · {doctor.email}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button className="text-xs bg-purple-100 px-2 py-1 rounded hover:bg-purple-200">
+                              Cambiar doctor
+                            </button>
+                          </form>
+                        )}
+
+                      </div>
+                    )}
+
+                  </td>
+
+                  <td className="p-3">
+                    {u.role === Role.STAFF ? (
+                      assignedDoctor ? (
+                        <div>
+                          <p className="font-medium">
+                            {assignedDoctor.fullName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {assignedDoctor.email}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-red-600 font-medium">
+                          Staff sin doctor
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-sm text-gray-400">
+                        —
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="p-3">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 rounded text-sm ${
+                        u.active
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {u.active ? "Activo" : "Inactivo"}
+                    </span>
+                  </td>
+
+                  <td className="p-3 space-y-2">
+                    <form action={toggleUserActive.bind(null, u.id)}>
+                      <button className="text-blue-600 underline">
+                        {u.active ? "Desactivar" : "Activar"}
+                      </button>
+                    </form>
+                  </td>
+
+                </tr>
+              )
+            })}
 
           </tbody>
 

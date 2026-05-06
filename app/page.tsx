@@ -1,11 +1,13 @@
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"
 
-import LandingClient from "./LandingClient";
+import LandingClient from "./LandingClient"
 
-export default function Page({
+export default async function Page({
   searchParams,
 }: {
-  searchParams?: { auth?: string };
+  searchParams?: Promise<{ auth?: string }>
 }) {
-  return <LandingClient auth={searchParams?.auth} />;
+  const params = await searchParams
+
+  return <LandingClient auth={params?.auth} />
 }
