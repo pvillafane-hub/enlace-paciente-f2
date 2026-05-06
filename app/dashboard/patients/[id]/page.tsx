@@ -221,7 +221,7 @@ export default async function PatientPage({
         </h2>
 
         <p className="text-sm text-gray-500 mb-4">
-          Añade laboratorios, radiografías, recetas u otros documentos al expediente del paciente.
+          Añade laboratorios, radiografías, medicamentos u otros documentos al expediente del paciente.
         </p>
 
         <Link

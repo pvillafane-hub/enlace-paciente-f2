@@ -221,7 +221,7 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
           </div>
 
           <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg font-semibold">
-            💊 Receta
+            💊 Medicamentos
           </div>
 
         </div>
