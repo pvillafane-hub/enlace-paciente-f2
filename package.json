@@ -13,11 +13,10 @@
     "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.998.0",
-    "@aws-sdk/s3-request-presigner": "^3.999.0",
     "@prisma/client": "^5.22.0",
     "@simplewebauthn/browser": "^13.2.2",
     "@simplewebauthn/server": "^13.3.3",
+    "@vercel/blob": "^2.8.1",
     "bcrypt": "^6.0.0",
     "browser-image-compression": "^2.0.2",
     "formidable": "^3.5.4",

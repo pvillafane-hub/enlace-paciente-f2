@@ -1,10 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import formidable, { type Fields, type Files } from 'formidable'
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { readFile, unlink } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { s3 } from '@/lib/s3'
+import { putDocument, removeDocument } from '@/lib/document-storage'
 import { getApiSession } from '@/lib/api-auth'
 import { canReadPatient } from '@/lib/access'
 import { MAX_UPLOAD_BYTES, detectDocumentType, validDateOnly } from '@/lib/file-policy'
@@ -36,11 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const bytes = await readFile(file.filepath)
     const contentType = detectDocumentType(bytes)
     if (!contentType || bytes.length > MAX_UPLOAD_BYTES) return res.status(400).json({ error: 'Solo PDF, JPEG, PNG y WebP' })
-    const bucket = process.env.AWS_BUCKET_NAME
-    if (!bucket) return res.status(503).json({ error: 'Almacenamiento no disponible' })
     const key = `documents/${randomUUID()}`
     const filename = (file.originalFilename || 'documento').replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 180)
-    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: contentType, ServerSideEncryption: 'AES256' }))
+    await putDocument(key, bytes, contentType)
     try {
       const document = await prisma.$transaction(async tx => {
         const created = await tx.document.create({ data: { userId: patientId, docType, facility, studyDate, filename, filePath: key, bodyPart: bodyPart || null, specialty: specialty || null } })
@@ -49,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       return res.status(200).json({ success: true, document, uploadedForUserId: patientId })
     } catch {
-      try { await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })) }
+      try { await removeDocument(key) }
       catch { console.error('UPLOAD_COMPENSATION_FAILED', { objectKey: key }) }
       throw new Error('Document persistence failed')
     }

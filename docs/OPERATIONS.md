@@ -1,5 +1,8 @@
 # Independent environment and release gate
 
+Storage update: see BLOB-MIGRATION.md. This branch now uses private Vercel Blob;
+S3 resource and signed-URL instructions below describe the prior storage design.
+
 ## Resources and configuration
 
 Create a separate Vercel project with production branch `mejoras/assessment`. Use a

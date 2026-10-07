@@ -1,3 +1,8 @@
+# Storage update
+
+The independent improvements branch uses private Vercel Blob, not the suspended AWS
+account. See docs/BLOB-MIGRATION.md for current setup and remaining release checks.
+
 # Enlace Salud — isolated improvement branch
 
 Next.js / React / TypeScript patient portal, PostgreSQL + Prisma, private S3 objects,

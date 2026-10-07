@@ -3,9 +3,8 @@ import { auditLog } from '@/lib/audit'
 import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
-import { s3 } from "@/lib/s3"
-import { GetObjectCommand } from "@aws-sdk/client-s3"
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { readDocument } from '@/lib/document-storage'
+import { Readable } from 'node:stream'
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,12 +15,6 @@ export default async function handler(
   }
 
   try {
-
-    // 🔐 VALIDAR ENV
-    const bucketName = process.env.AWS_BUCKET_NAME
-    if (!bucketName) {
-      throw new Error("AWS_BUCKET_NAME no configurado")
-    }
 
     // 🔐 VALIDAR SESIÓN
     const sessionId = req.cookies.pp_session
@@ -72,25 +65,23 @@ export default async function handler(
 
     if (!await canReadPatient(session.user, document.userId)) return res.status(403).json({ error: 'Acceso denegado' })
 
-    // ☁️ GENERAR SIGNED URL
-    const command = new GetObjectCommand({
-      Bucket: bucketName,
-      Key: document.filePath
-    })
-
-    const signedUrl = await getSignedUrl(s3, command, {
-      expiresIn: 60 // ⏱️ 1 minuto
-    })
-
+    const file = await readDocument(document.filePath)
+    if (!file || file.statusCode !== 200) return res.status(404).json({ error: 'Documento no disponible' })
     await auditLog({ userId, action: 'DOCUMENT_VIEW', entityId: id })
-
     res.setHeader('Cache-Control', 'private, no-store')
-    // 🔄 REDIRECT
-    return res.redirect(signedUrl)
+    res.setHeader('Content-Type', file.blob.contentType || 'application/octet-stream')
+    res.setHeader('Content-Disposition', 'inline')
+    await new Promise<void>((resolve, reject) => {
+      const stream = Readable.fromWeb(file.stream as never)
+      stream.on('error', reject)
+      res.on('finish', resolve)
+      res.on('close', () => { stream.destroy(); resolve() })
+      stream.pipe(res)
+    })
 
   } catch (error) {
 
-    console.error("VIEW DOCUMENT ERROR:", error)
+    console.error("VIEW_DOCUMENT_FAILED")
 
     return res.status(500).json({
       error: "Error al acceder al documento. Intente nuevamente.",

@@ -10,7 +10,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { user: mocks.user, doctorPatient: mock
 vi.mock('@/lib/api-auth', () => ({ getApiSession: mocks.getSession }))
 vi.mock('@/lib/auth', () => ({ hashPassword: vi.fn().mockResolvedValue('random-password-hash') }))
 vi.mock('formidable', () => ({ default: () => ({ on: vi.fn(), parse: mocks.parse }) }))
-vi.mock('@/lib/s3', () => ({ s3: { send: vi.fn() } }))
+vi.mock('@/lib/document-storage', () => ({ putDocument: vi.fn(), removeDocument: vi.fn() }))
 import createPatient from '../pages/api/staff/create-patient'
 import upload from '../pages/api/upload/create'
 function res() {
