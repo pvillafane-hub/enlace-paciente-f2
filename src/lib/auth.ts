@@ -1,3 +1,4 @@
+import { getApiSession } from '@/lib/api-auth'
 import bcrypt from 'bcrypt'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
@@ -55,22 +56,8 @@ export async function getValidSession() {
 
   if (!sessionId) return null
 
-  const session = await prisma.session.findUnique({
-    where: { id: sessionId },
-  })
+  return getApiSession(sessionId)
 
-  if (!session) return null
-
-  if (session.expiresAt < new Date()) {
-    return null
-  }
-
-  // ✅ FIX CLAVE: asegurar userId válido
-  if (!session.userId) {
-    return null
-  }
-
-  return session
 }
 
 

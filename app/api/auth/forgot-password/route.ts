@@ -26,9 +26,7 @@ export async function POST(req: Request) {
       },
     })
 
-    console.log(
-      `RESET LINK: ${process.env.NEXT_PUBLIC_APP_URL}/reset-password/${rawToken}`
-    )
+
   }
 
   return NextResponse.json({ message: 'OK' })

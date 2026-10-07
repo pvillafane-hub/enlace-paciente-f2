@@ -64,17 +64,7 @@ export default async function PatientPage({
       redirect('/dashboard')
     }
 
-    await prisma.medicalAlert.updateMany({
-      where: {
-        doctorId,
-        patientId,
-        resolved: false
-      },
-      data: {
-        resolved: true,
-        resolvedAt: new Date()
-      }
-    })
+
   }
 
   let patient
@@ -150,6 +140,7 @@ export default async function PatientPage({
       where: { id: patientId },
       include: {
         documents: {
+          where: { deletedAt: null },
           orderBy: { studyDate: 'desc' }
         }
       }
@@ -164,7 +155,7 @@ export default async function PatientPage({
       documents: realPatient.documents.map(doc => ({
         ...doc,
         studyDate: new Date(doc.studyDate),
-        deletedAt: null
+        deletedAt: doc.deletedAt
       }))
     }
   }

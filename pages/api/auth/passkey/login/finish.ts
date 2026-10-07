@@ -23,11 +23,8 @@ export default async function handler(
     const db = prisma
     const body = req.body
 
-    console.log("🟡 BODY RECEIVED:", JSON.stringify(body, null, 2))
-
     // 🔐 Obtener sesión
     const sessionId = req.cookies.pp_session
-    console.log("🟡 SESSION ID:", sessionId)
 
     if (!sessionId) {
       return res.status(401).json({ error: 'No session' })
@@ -37,20 +34,15 @@ export default async function handler(
       where: { id: sessionId },
     })
 
-    console.log("🟡 SESSION DB:", session)
-
-    if (!session || !session.challenge) {
+    if (!session || !session.challenge || session.expiresAt <= new Date()) {
       return res.status(400).json({ error: 'Challenge missing' })
     }
 
     const expectedChallenge = session.challenge
-    console.log("🟡 EXPECTED CHALLENGE:", expectedChallenge)
 
     // 🔥 Normalizar ID
     const normalizedId = base64urlToBase64(body.id)
 
-    console.log("🟡 ORIGINAL ID:", body.id)
-    console.log("🟡 NORMALIZED ID:", normalizedId)
 
     // 🔥 BUSCAR DE DOS FORMAS (CLAVE)
     let method = await db.authMethod.findFirst({
@@ -67,8 +59,6 @@ export default async function handler(
       })
     }
 
-    console.log("🟡 MATCHED METHOD:", method)
-
     if (!method) {
       console.warn("⚠️ Passkey no registrada en el sistema")
 
@@ -76,6 +66,9 @@ export default async function handler(
         error: 'Esta passkey no está registrada. Activa Entrar Fácil primero.',
       })
     }
+
+    const user = await db.user.findUnique({ where: { id: method.userId } })
+    if (!user?.active) return res.status(401).json({ error: 'Unauthorized' })
 
     // 🔥 FIX REAL (PROD vs LOCAL)
     const isProd = process.env.NODE_ENV === 'production'
@@ -88,8 +81,6 @@ export default async function handler(
       ? 'enlace-salud-seven.vercel.app'
       : 'localhost'
 
-    console.log("🟡 ORIGIN:", origin)
-    console.log("🟡 RP ID:", rpID)
 
     const verification = await verifyAuthenticationResponse({
       response: body,
@@ -103,13 +94,10 @@ export default async function handler(
       },
     })
 
-    console.log("🟡 VERIFICATION RESULT:", verification)
-
     if (!verification.verified) {
-      console.error("❌ VERIFICATION FAILED FULL:", verification)
+      console.warn("Passkey verification failed")
       return res.status(400).json({
         error: 'Verification failed',
-        verification,
       })
     }
 

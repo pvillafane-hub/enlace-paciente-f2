@@ -1,3 +1,4 @@
+import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import formidable from 'formidable'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
@@ -25,7 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Método no permitido' })
   }
 
-  const form = formidable({ multiples: false })
+  const session = await getApiSession(req.cookies.pp_session)
+  if (!session) return res.status(401).json({ error: "No autorizado" })
+
+  const form = formidable({ multiples: false, maxFiles: 1, maxFileSize: 10 * 1024 * 1024, maxTotalFileSize: 10 * 1024 * 1024 })
 
   form.parse(req, async (err, fields, files) => {
 
@@ -34,21 +38,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (err) {
         console.error(err)
         return res.status(500).json({ error: 'Error procesando archivo' })
-      }
-
-      // 🔐 SESSION
-      const cookies = parse(req.headers.cookie || "")
-      const sessionId = cookies.pp_session
-
-      const session = await prisma.session.findUnique({
-        where: { id: sessionId },
-        include: {
-          user: true,
-        },
-      })
-
-      if (!session?.userId || !session.user) {
-        return res.status(401).json({ error: "No autorizado" })
       }
 
       const currentUser = session.user

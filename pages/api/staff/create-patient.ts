@@ -1,22 +1,6 @@
+import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
-
-const SESSION_COOKIE = "pp_session"
-
-async function getApiUser(req: NextApiRequest) {
-  const sessionId = req.cookies[SESSION_COOKIE]
-
-  if (!sessionId) return null
-
-  const session = await prisma.session.findUnique({
-    where: { id: sessionId },
-    include: { user: true },
-  })
-
-  if (!session || !session.user) return null
-
-  return session.user
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -24,7 +8,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const user = await getApiUser(req)
+    const session = await getApiSession(req.cookies.pp_session)
+    const user = session?.user
    
     if (!user) {
       return res.status(401).json({ error: "No autenticado" })
@@ -76,6 +61,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
+    // Existing accounts must grant access through the patient approval flow.
+    if (existingPatient) {
+      const access = await prisma.doctorPatient.findUnique({
+        where: { doctorId_patientId: { doctorId, patientId: existingPatient.id } },
+      })
+      if (!existingPatient.active || !access) {
+        return res.status(403).json({ error: "El paciente debe aprobar la solicitud de acceso" })
+      }
+    }
+
     const patient =
       existingPatient ||
       (await prisma.user.create({
@@ -113,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       success: true,
-      patient,
+      patient: { id: patient.id, fullName: patient.fullName, email: patient.email },
     })
   } catch (error) {
     console.error("STAFF_CREATE_PATIENT_ERROR", error)

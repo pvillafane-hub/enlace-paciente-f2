@@ -69,6 +69,8 @@ export async function changeUserRole(
     throw new Error("No puedes cambiar rol de un admin")
   }
 
+  if (newRole !== "PATIENT" && newRole !== "DOCTOR") throw new Error("Rol inválido")
+
   // 🔒 Evitar cambios innecesarios
   if (user.role === newRole) return
 

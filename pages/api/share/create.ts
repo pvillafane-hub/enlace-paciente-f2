@@ -1,3 +1,4 @@
+import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import crypto from 'crypto'
 
@@ -31,9 +32,7 @@ export default async function handler(
       return res.status(401).json({ error: 'Unauthorized - No session' })
     }
 
-    const session = await db.session.findUnique({
-      where: { id: sessionId },
-    })
+    const session = await getApiSession(sessionId)
 
     if (!session || session.expiresAt < new Date()) {
       return res.status(401).json({ error: 'Invalid or expired session' })
@@ -46,6 +45,7 @@ export default async function handler(
       where: {
         id: documentId,
         userId,
+        deletedAt: null,
       },
     })
 

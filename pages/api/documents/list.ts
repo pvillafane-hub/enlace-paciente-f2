@@ -1,3 +1,4 @@
+import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma'
 
@@ -16,9 +17,7 @@ export default async function handler(
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-    })
+    const session = await getApiSession(sessionId)
 
     // ✅ FIX CRÍTICO
     if (!session || session.expiresAt < new Date() || !session.userId) {
@@ -28,7 +27,7 @@ export default async function handler(
     const userId = session.userId
 
     const documents = await prisma.document.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     })
 

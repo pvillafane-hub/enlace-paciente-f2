@@ -1,3 +1,4 @@
+import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { s3 } from "@/lib/s3"
@@ -27,9 +28,7 @@ export default async function handler(
       return res.status(401).json({ error: "Sesión no encontrada" })
     }
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId }
-    })
+    const session = await getApiSession(sessionId)
 
     if (!session || session.expiresAt < new Date()) {
       return res.status(401).json({ error: "Sesión inválida o expirada" })
@@ -58,7 +57,7 @@ export default async function handler(
       where: { id }
     })
 
-    if (!document) {
+    if (!document || document.deletedAt) {
       return res.status(404).json({ error: "Documento no encontrado" })
     }
 
@@ -73,9 +72,12 @@ export default async function handler(
     const isOwner = document.userId === userId
 
     if (!isOwner) {
+      if (!["DOCTOR", "STAFF"].includes(session.user.role)) return res.status(403).json({ error: "Acceso denegado" })
       const relation = await prisma.doctorPatient.findFirst({
         where: {
-          doctorId: userId,
+          doctorId: session.user.role === 'STAFF'
+            ? (await prisma.clinicStaff.findFirst({ where: { staffId: userId, active: true, doctor: { active: true, role: 'DOCTOR' } } }))?.doctorId ?? '__denied__'
+            : userId,
           patientId: document.userId
         }
       })
@@ -105,6 +107,7 @@ export default async function handler(
       documentId: id,
     })
 
+    res.setHeader('Cache-Control', 'private, no-store')
     // 🔄 REDIRECT
     return res.redirect(signedUrl)
 

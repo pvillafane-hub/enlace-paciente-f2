@@ -92,7 +92,7 @@ export default async function SharedDocumentPage({
   }
 
   // 📁 3️⃣ Documento eliminado
-  if (!share.document) {
+  if (!share.document || share.document.deletedAt) {
     return (
       <MessagePage
         title="📄 Documento no disponible"
