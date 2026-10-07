@@ -2,16 +2,7 @@ import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import crypto from 'crypto'
 
-let prisma: any
-
-async function getPrisma() {
-  if (!prisma) {
-    const { PrismaClient } = await import('@prisma/client')
-    prisma = new PrismaClient()
-  }
-  return prisma
-}
-
+import { prisma } from '@/lib/prisma'
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -21,9 +12,10 @@ export default async function handler(
   }
 
   try {
-    const db = await getPrisma()
+    const db = prisma
 
-    const { documentId, days } = req.body
+    const { documentId, days = 1 } = req.body ?? {}
+    if (typeof documentId !== 'string' || !Number.isInteger(days) || days < 1 || days > 7) return res.status(400).json({ error: 'Seleccione de 1 a 7 días' })
 
     // 🔐 1️⃣ Validar sesión
     const sessionId = req.cookies.pp_session
@@ -60,12 +52,20 @@ export default async function handler(
       Date.now() + (days || 1) * 24 * 60 * 60 * 1000
     )
 
-    await db.shareLink.create({
+    await db.$transaction(async tx => {
+    // Lock the document so deletion cannot race with link creation.
+    await tx.$queryRaw`SELECT "id" FROM "Document" WHERE "id" = ${documentId} FOR UPDATE`
+    const current = await tx.document.findFirst({ where: { id: documentId, userId, deletedAt: null } })
+    if (!current) throw new Error("Document unavailable")
+    await tx.shareLink.create({
       data: {
         documentId,
         token,
         expiresAt,
       },
+    })
+
+    await tx.auditLog.create({ data: { userId, action: 'DOCUMENT_SHARED', entityId: documentId } })
     })
 
     return res.status(200).json({ token })

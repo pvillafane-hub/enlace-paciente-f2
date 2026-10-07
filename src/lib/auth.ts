@@ -34,6 +34,7 @@ export async function setSession(userId: string) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
+    maxAge: SESSION_DURATION / 1000,
   })
 }
 
@@ -103,7 +104,9 @@ export async function getValidatedSession(): Promise<{
   }
 
   // 🔄 Sliding renewal
-  await refreshSession(session.id)
+  if (session.expiresAt.getTime() - Date.now() < SESSION_DURATION / 2) {
+    await prisma.session.updateMany({ where: { id: session.id }, data: { expiresAt: new Date(Math.min(Date.now() + SESSION_DURATION, session.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000)) } })
+  }
 
   // ✅ RETURN TIPADO SEGURO
   return {

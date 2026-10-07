@@ -19,7 +19,7 @@ export default async function Dashboard() {
   const userData = await prisma.user.findUnique({
     where: { id: session.userId },
     include: {
-      documents: true
+      documents: { where: { deletedAt: null } }
     }
   })
 
@@ -50,7 +50,7 @@ export default async function Dashboard() {
   }
 
   const isDevBypass =
-    process.env.DEV_BYPASS_LICENSE === "true"
+    process.env.NODE_ENV !== "production" && process.env.DEV_BYPASS_LICENSE === "true"
 
   const licenseInactive =
     isDoctor &&
@@ -70,7 +70,8 @@ export default async function Dashboard() {
       const staffRelation = await prisma.clinicStaff.findFirst({
         where: {
           staffId: userData.id,
-          active: true
+          active: true,
+          doctor: { active: true, role: "DOCTOR" }
         }
       })
 
@@ -117,12 +118,14 @@ export default async function Dashboard() {
     } else {
       patientsData = await prisma.doctorPatient.findMany({
         where: {
-          doctorId: clinicDoctorId
+          doctorId: clinicDoctorId,
+          patient: { active: true, role: "PATIENT" }
         },
         include: {
           patient: {
             include: {
               documents: {
+                where: { deletedAt: null },
                 orderBy: { createdAt: "desc" },
                 take: 5
               }
@@ -183,12 +186,12 @@ export default async function Dashboard() {
             <span>
               ⚠️ Tu licencia está inactiva. Actívala para acceder a tus pacientes.
             </span>
-            <a
-              href="/api/stripe/checkout"
+            <form method="post" action="/api/stripe/checkout"><button
+              type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
             >
               Activar licencia
-            </a>
+            </button></form>
           </div>
         )}
 
@@ -205,7 +208,7 @@ export default async function Dashboard() {
         <div className="grid md:grid-cols-3 gap-6">
           <StatCard title="Pacientes totales" value={patients.length} />
           <StatCard title="Con actividad reciente" value={patients.length - criticalPatients.length} />
-          <StatCard title="Pacientes de alta necesidad" value={criticalPatients.length} />
+          <StatCard title="Sin actividad documental reciente" value={criticalPatients.length} />
         </div>
 
         <ActivatePatientBox />
@@ -251,7 +254,7 @@ export default async function Dashboard() {
 
                       {isCritical && (
                         <p className="text-yellow-900 text-xs font-medium mt-1">
-                          Requiere revisión
+                          Sin actividad documental reciente
                         </p>
                       )}
 
@@ -266,7 +269,7 @@ export default async function Dashboard() {
 
                       {isCritical && (
                         <span className="text-xs font-semibold text-yellow-900 bg-yellow-300 px-2 py-1 rounded">
-                          Alta necesidad
+                          Sin actividad reciente
                         </span>
                       )}
 
@@ -316,7 +319,10 @@ export default async function Dashboard() {
     !userData.allergies
 
   const user = {
-    ...userData,
+    id: userData.id,
+    fullName: userData.fullName,
+    email: userData.email,
+    createdAt: userData.createdAt,
     documents: userData.documents.map(doc => ({
       ...doc,
       studyDate: new Date(doc.studyDate)

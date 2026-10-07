@@ -1,13 +1,13 @@
 'use client';
 
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 
 type FormState = {
   error?: string
   success?: string
 }
 export default function ChangePasswordForm({ action }: any) {
-  const [state, formAction] = useFormState<FormState, FormData>(action, {})
+  const [state, formAction] = useActionState<FormState, FormData>(action, {})
 
   return (
     <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg">

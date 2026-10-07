@@ -1,3 +1,4 @@
+import { decideAccess } from '@/lib/consent'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -9,36 +10,12 @@ import { revalidatePath } from 'next/cache'
 
 async function approveRequest(formData: FormData) {
   'use server'
-
   const session = await getValidatedSession()
-
-  if (!session || !session.userId) {
-    redirect('/?auth=required')
-  }
-
-  const requestId = String(formData.get('requestId'))
-
-  const request = await prisma.medicalAccessRequest.findUnique({
-    where: { id: requestId }
-  })
-
-  if (!request) return
-
-  await prisma.doctorPatient.create({
-    data: {
-      doctorId: request.doctorId,
-      patientId: request.patientId
-    }
-  })
-
-  await prisma.medicalAccessRequest.update({
-    where: { id: requestId },
-    data: {
-      status: "APPROVED"
-    }
-  })
-
-  revalidatePath('/dashboard/requests')
+  if (!session) redirect('/login')
+  const requestId = formData.get('requestId')
+  if (typeof requestId !== 'string' || !requestId) throw new Error('Solicitud inválida')
+  await decideAccess(session.userId, requestId, true)
+  revalidatePath('/dashboard/doctors/requests')
 }
 
 // ==============================
@@ -47,23 +24,12 @@ async function approveRequest(formData: FormData) {
 
 async function rejectRequest(formData: FormData) {
   'use server'
-
   const session = await getValidatedSession()
-
-  if (!session || !session.userId) {
-    redirect('/?auth=required')
-  }
-
-  const requestId = String(formData.get('requestId'))
-
-  await prisma.medicalAccessRequest.update({
-    where: { id: requestId },
-    data: {
-      status: "REJECTED"
-    }
-  })
-
-  revalidatePath('/dashboard/requests')
+  if (!session) redirect('/login')
+  const requestId = formData.get('requestId')
+  if (typeof requestId !== 'string' || !requestId) throw new Error('Solicitud inválida')
+  await decideAccess(session.userId, requestId, false)
+  revalidatePath('/dashboard/doctors/requests')
 }
 
 // ==============================

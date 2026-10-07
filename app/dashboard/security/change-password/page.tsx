@@ -1,77 +1,20 @@
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcrypt'
-import { revalidatePath } from 'next/cache'
+import { changeOwnPassword } from '@/lib/password-change'
+import { allowAttempt } from '@/lib/rate-limit'
 import ChangePasswordForm from './ChangePasswordForm'
 
 export default async function ChangePasswordPage() {
-
-  const session = await getValidatedSession()
-
-  // ✅ FIX CRÍTICO (page)
-  if (!session?.userId) {
-    redirect('/?auth=required')
-  }
-
-  const userId = session.userId
-
-  async function changePassword(
-    prevState: any,
-    formData: FormData
-  ) {
+  if (!await getValidatedSession()) redirect('/login')
+  async function changePassword(_state: { error?: string; success?: string }, formData: FormData) {
     'use server'
-
-    // ✅ FIX CRÍTICO (server action)
-    if (!userId) {
-      throw new Error("Unauthorized")
-    }
-
-    const currentPassword = String(formData.get('currentPassword') || '')
-    const newPassword = String(formData.get('newPassword') || '')
-    const confirmPassword = String(formData.get('confirmPassword') || '')
-
-    // Validaciones básicas
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      return { error: 'Debe completar todos los campos.' }
-    }
-
-    if (newPassword.length < 8) {
-      return { error: 'La nueva contraseña debe tener al menos 8 caracteres.' }
-    }
-
-    if (newPassword !== confirmPassword) {
-      return { error: 'Las contraseñas no coinciden.' }
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    })
-
-    if (!user) {
-      return { error: 'Usuario no encontrado.' }
-    }
-
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash)
-
-    if (!valid) {
-      return { error: 'La contraseña actual no es correcta.' }
-    }
-
-    const newHash = await bcrypt.hash(newPassword, 12)
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: newHash,
-        passwordChangedAt: new Date(),
-      },
-    })
-
-    revalidatePath('/dashboard/security')
-
-    return { success: 'Contraseña actualizada correctamente.' }
+    const session = await getValidatedSession()
+    if (!session) return { error: 'Inicie sesión nuevamente.' }
+    if (!await allowAttempt('change-password', session.userId)) return { error: 'Intente más tarde.' }
+    if (formData.get('newPassword') !== formData.get('confirmPassword')) return { error: 'Las contraseñas no coinciden.' }
+    try { await changeOwnPassword(session.userId, formData.get('currentPassword'), formData.get('newPassword')) }
+    catch { return { error: 'Verifique su contraseña actual y los requisitos de la nueva contraseña.' } }
+    redirect('/login?password=changed')
   }
-
   return <ChangePasswordForm action={changePassword} />
 }

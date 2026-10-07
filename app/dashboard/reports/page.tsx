@@ -34,6 +34,7 @@ export default async function ReportsPage() {
 
   const documents = await prisma.document.findMany({
     where: {
+      deletedAt: null,
       userId: {
         in: patientIds
       }
@@ -50,6 +51,7 @@ export default async function ReportsPage() {
   const documentsByType = await prisma.document.groupBy({
     by: ["docType"],
     where: {
+      deletedAt: null,
       userId: {
         in: patientIds
       }
@@ -68,6 +70,7 @@ export default async function ReportsPage() {
   const activity = await prisma.document.groupBy({
     by: ["userId"],
     where: {
+      deletedAt: null,
       userId: { in: patientIds }
     },
     _max: {

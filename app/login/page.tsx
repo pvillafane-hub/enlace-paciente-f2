@@ -2,15 +2,15 @@
 
 import { useActionState } from "react"
 import { login } from './actions'
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 
 export default function LoginPage() {
-  const [state, formAction] = useActionState(login, null)
+  const [state, formAction, isSubmitting] = useActionState(login, null)
 
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<any>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [clientErrors, setClientErrors] = useState<{
     email?: string
@@ -19,14 +19,7 @@ export default function LoginPage() {
 
   const [hasPasskey, setHasPasskey] = useState(false)
   const [checkingPasskey, setCheckingPasskey] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (state?.error) {
-      setIsSubmitting(false)
-      setClientErrors({})
-    }
-  }, [state])
+  const [emailValue, setEmailValue] = useState('')
 
   function validateField(name: string, value: string) {
     // limpiar error primero
@@ -170,10 +163,10 @@ export default function LoginPage() {
       return
     }
 
-    setIsSubmitting(true)
+
   }
 
-  const isEmailValid = emailRef.current?.value?.includes('@')
+  const isEmailValid = emailValue.includes('@')
 
   return (
     <div className="w-full max-w-md mx-auto mt-10 md:mt-16 bg-white p-6 md:p-8 rounded-2xl shadow-lg">
@@ -203,7 +196,7 @@ export default function LoginPage() {
             type="email"
             name="email"
             placeholder="Ej. usuario@email.com"
-            onChange={(e) => handleEmailChange(e.target.value)}
+            onChange={(e) => { setEmailValue(e.target.value); handleEmailChange(e.target.value) }}
             className={`mt-2 w-full p-4 text-lg border rounded-xl focus:ring-2 transition min-h-[56px] ${
               clientErrors.email
                 ? 'border-red-600 bg-red-50 focus:ring-red-500'

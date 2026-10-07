@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 export default function ResetPasswordDirectPage() {
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [message, setMessage] = useState('')
@@ -23,11 +24,11 @@ export default function ResetPasswordDirectPage() {
     const res = await fetch('/api/auth/reset-direct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ currentPassword, password }),
     })
 
     if (res.ok) {
-      setMessage('Contraseña actualizada correctamente.')
+      window.location.assign('/login?password=changed')
     } else {
       setMessage('Error actualizando contraseña.')
     }
@@ -40,6 +41,10 @@ export default function ResetPasswordDirectPage() {
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="block">Contraseña actual
+          <input type="password" autoComplete="current-password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full border p-3 rounded" />
+        </label>
+        <p className="text-sm">Use de 8 a 72 bytes, con mayúscula, minúscula, número y símbolo.</p>
         <input
           type="password"
           placeholder="Nueva contraseña"

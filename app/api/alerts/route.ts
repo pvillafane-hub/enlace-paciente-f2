@@ -1,3 +1,4 @@
+import { clinicDoctorId } from '@/lib/access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { NextResponse } from "next/server"
@@ -20,12 +21,15 @@ export async function GET() {
       )
     }
 
-    const userId = session.userId
+    const actor = await prisma.user.findUnique({ where: { id: session.userId } })
+    const userId = actor ? await clinicDoctorId(actor) : null
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     const alerts = await prisma.medicalAlert.findMany({
       where: {
         doctorId: userId,
-        resolved: false
+        resolved: false,
+        patient: { active: true, patientDoctors: { some: { doctorId: userId } } }
       },
       include: {
         patient: {

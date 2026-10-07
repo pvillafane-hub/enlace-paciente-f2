@@ -20,8 +20,11 @@ model Session {
   createdAt DateTime @default(now())
   expiresAt DateTime
   challenge String?
+  challengeExpiresAt DateTime?
 
   user User? @relation(fields: [userId], references: [id])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model User {
@@ -97,6 +100,7 @@ model Document {
 
   user   User        @relation(fields: [userId], references: [id])
   shares ShareLink[]
+  @@index([userId, deletedAt, createdAt])
 }
 
 model ShareLink {
@@ -118,6 +122,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  @@index([userId, createdAt])
 }
 
 model PasswordResetToken {
@@ -129,6 +134,8 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([tokenHash])
+  @@index([userId, expiresAt])
 }
 
 model AccountActivity {
@@ -184,6 +191,7 @@ model MedicalAlert {
 
   doctor  User @relation("DoctorAlerts", fields: [doctorId], references: [id])
   patient User @relation("PatientAlerts", fields: [patientId], references: [id])
+  @@index([doctorId, resolved, createdAt])
 }
 
 enum Role {
@@ -203,6 +211,7 @@ model License {
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  @@index([userId, status, createdAt])
 }
 
 model PatientQRToken {
@@ -231,4 +240,16 @@ model ClinicStaff {
   staff  User @relation("StaffUser", fields: [staffId], references: [id])
 
   @@unique([doctorId, staffId])
+  @@index([staffId, active])
+}
+model SecurityRateLimit {
+  id String @id
+  count Int
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model PaymentEvent {
+  id String @id
+  createdAt DateTime @default(now())
 }

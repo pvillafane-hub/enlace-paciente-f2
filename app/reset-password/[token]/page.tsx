@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
-export default function ResetPasswordPage({
-  params,
-}: {
-  params: { token: string }
-}) {
+export default function ResetPasswordPage() {
+  const params = useParams<{ token: string }>()
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const router = useRouter()
@@ -15,6 +13,7 @@ export default function ResetPasswordPage({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
+    setError('')
 
     const formData = new FormData(e.currentTarget)
 
@@ -22,7 +21,7 @@ export default function ResetPasswordPage({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        token: params.token,
+        token: params?.token,
         password: formData.get('password'),
       }),
     })
@@ -32,6 +31,7 @@ export default function ResetPasswordPage({
       setTimeout(() => router.push('/login'), 3000)
     }
 
+    if (!res.ok) setError('El enlace no está disponible o la contraseña no cumple los requisitos.')
     setLoading(false)
   }
 
@@ -54,6 +54,8 @@ export default function ResetPasswordPage({
         Restablecer contraseña
       </h2>
 
+      <p className="mb-4">Use de 8 a 72 bytes, con mayúscula, minúscula, número y símbolo.</p>
+      {error && <p role="alert" className="text-red-700 mb-4">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-6">
         <input
           type="password"

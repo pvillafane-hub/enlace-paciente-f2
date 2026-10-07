@@ -15,7 +15,9 @@ export async function revokeAccess(formData: FormData) {
     throw new Error("Unauthorized")
   }
 
-  const doctorId = String(formData.get("doctorId"))
+  const actor = await prisma.user.findFirst({ where: { id: session.userId, active: true, role: 'PATIENT' }, select: { id: true } })
+  if (!actor) throw new Error('Unauthorized')
+  const doctorId = String(formData.get("doctorId") || '')
 
   if (!doctorId) {
     throw new Error("DoctorId missing")
@@ -23,18 +25,10 @@ export async function revokeAccess(formData: FormData) {
 
   const patientId = session.userId
 
-  await prisma.doctorPatient.deleteMany({
-    where: {
-      doctorId,
-      patientId
-    }
-  })
-
-  await prisma.medicalAccessRequest.deleteMany({
-    where: {
-      doctorId,
-      patientId
-    }
+  await prisma.$transaction(async tx => {
+    await tx.doctorPatient.deleteMany({ where: { doctorId, patientId } })
+    await tx.medicalAccessRequest.deleteMany({ where: { doctorId, patientId } })
+    await tx.auditLog.create({ data: { userId: patientId, action: 'ACCESS_REVOKED', entityId: doctorId } })
   })
 
   revalidatePath('/dashboard/doctors')
@@ -64,11 +58,12 @@ export async function inviteDoctor(formData: FormData) {
     where: { email }
   })
 
-  if (!doctor || doctor.role !== "DOCTOR") {
+  if (!doctor || !doctor.active || doctor.role !== "DOCTOR") {
     throw new Error("Doctor no encontrado")
   }
 
   const patientId = session.userId
+  if (!await prisma.user.findFirst({ where: { id: patientId, active: true, role: 'PATIENT' }, select: { id: true } })) throw new Error('Unauthorized')
 
   // 🔒 Evita duplicados
   await prisma.medicalAccessRequest.upsert({

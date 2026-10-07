@@ -58,3 +58,6 @@ public/uploads/
 backup_*
 portal_paciente_backup.sql
 
+
+!.env.example
+!prisma/migrations/**/migration.sql

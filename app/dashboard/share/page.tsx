@@ -2,40 +2,19 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import ShareClient from './share-client'
-import { cookies } from 'next/headers'
-
-let prisma: any
-
-async function getPrisma() {
-  if (!prisma) {
-    const { PrismaClient } = await import('@prisma/client')
-    prisma = new PrismaClient()
-  }
-  return prisma
-}
+import { prisma as db } from '@/lib/prisma'
+import { getValidatedSession } from '@/lib/auth'
 
 export default async function SharePage() {
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get('pp_session')?.value
-
-  if (!sessionId) redirect('/login')
-
-  const db = await getPrisma()
-
-  const session = await db.session.findUnique({
-    where: { id: sessionId },
-  })
-
-  // ✅ FIX CRÍTICO
-  if (!session || session.expiresAt < new Date() || !session.userId) {
-    redirect('/login')
-  }
+  const session = await getValidatedSession()
+  if (!session) redirect('/login')
 
   const userId = session.userId
 
   const documents = await db.document.findMany({
     where: {
       userId: userId,
+      deletedAt: null,
     },
     orderBy: { createdAt: 'desc' },
   })

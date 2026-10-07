@@ -1,3 +1,4 @@
+import { clinicDoctorId } from '@/lib/access'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
@@ -22,11 +23,14 @@ export default async function AlertsPage() {
     redirect('/?auth=required')
   }
 
-  const doctorId = session.userId
+  const actor = await prisma.user.findUnique({ where: { id: session.userId } })
+  const doctorId = actor ? await clinicDoctorId(actor) : null
+  if (!doctorId) redirect('/dashboard')
 
   const alerts: AlertWithPatient[] = await prisma.medicalAlert.findMany({
     where: {
-      doctorId
+      doctorId,
+      patient: { active: true, patientDoctors: { some: { doctorId } } }
     },
     include: {
       patient: true

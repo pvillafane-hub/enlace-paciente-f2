@@ -1,3 +1,4 @@
+import { canReadPatient } from '@/lib/access'
 import Link from 'next/link'
 import DocumentSearch from '@/components/DocumentSearch'
 import { prisma } from '@/lib/prisma'
@@ -56,6 +57,7 @@ export default async function PatientPage({
   }
 
   if (!isDemo) {
+    if (!await canReadPatient(user, patientId)) redirect('/dashboard')
     const access = await prisma.doctorPatient.findFirst({
       where: { doctorId, patientId }
     })

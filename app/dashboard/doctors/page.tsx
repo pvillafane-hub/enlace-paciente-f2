@@ -145,6 +145,7 @@ export default async function DoctorsPage() {
       patient: {
         include: {
           documents: {
+            where: { deletedAt: null },
             orderBy: {
               createdAt: "desc"
             }

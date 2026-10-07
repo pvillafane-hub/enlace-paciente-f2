@@ -1,86 +1,35 @@
-import { stripe } from "@/lib/stripe"
-import { prisma } from "@/lib/prisma"
-import { headers } from "next/headers"
-import { NextResponse } from "next/server"
+import { getStripe } from '@/lib/stripe'
+import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import { validProPayment } from '@/lib/payment-policy'
+import type Stripe from 'stripe'
 
 export async function POST(req: Request) {
-  const body = await req.text()
-
-  // 🔥 FIX Next.js 16 (headers async)
-  const sig = (await headers()).get("stripe-signature")
-
-  if (!sig) {
-    return NextResponse.json(
-      { error: "Missing stripe signature" },
-      { status: 400 }
-    )
-  }
-
-  let event
-
+  const sig = req.headers.get('stripe-signature')
+  const secret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!sig) return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+  if (!secret) return NextResponse.json({ error: 'Webhook unavailable' }, { status: 503 })
+  let event: Stripe.Event
+  try { event = getStripe().webhooks.constructEvent(await req.text(), sig, secret) }
+  catch { return NextResponse.json({ error: 'Invalid webhook' }, { status: 400 }) }
+  if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) return NextResponse.json({ received: true })
+  const session = event.data.object as Stripe.Checkout.Session
+  if (!validProPayment(session)) return NextResponse.json({ received: true })
+  const userId = session.metadata!.userId
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
-  } catch (err) {
-    console.error("Webhook signature error:", err)
-
-    return NextResponse.json(
-      { error: "Webhook error" },
-      { status: 400 }
-    )
+    await prisma.$transaction(async tx => {
+      // A checkout may emit multiple successful events; consume the checkout ID once.
+      await tx.paymentEvent.create({ data: { id: session.id } })
+      if (!await tx.user.findFirst({ where: { id: userId, role: 'DOCTOR', active: true }, select: { id: true } })) throw new Error('User unavailable')
+      const license = await tx.license.findFirst({ where: { userId, role: 'DOCTOR' } })
+      if (license) await tx.license.update({ where: { id: license.id }, data: { status: 'ACTIVE', plan: 'PRO', validUntil: null } })
+      else await tx.license.create({ data: { userId, role: 'DOCTOR', status: 'ACTIVE', plan: 'PRO' } })
+      await tx.auditLog.create({ data: { userId, action: 'LICENSE_PAYMENT_APPLIED', entityId: session.id } })
+    })
+  } catch {
+    if (await prisma.paymentEvent.findUnique({ where: { id: session.id } })) return NextResponse.json({ received: true })
+    console.error('PAYMENT_PERSISTENCE_FAILED')
+    return NextResponse.json({ error: 'Retry later' }, { status: 500 })
   }
-
-  // 🎯 EVENTO: PAGO COMPLETADO
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as any
-
-    const userId = session?.metadata?.userId
-
-    if (!userId) {
-      console.error("No userId in metadata")
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 })
-    }
-
-    console.log("💰 Pago recibido para user:", userId)
-
-    try {
-      const existing = await prisma.license.findFirst({
-        where: {
-          userId,
-          role: "DOCTOR"
-        }
-      })
-
-      if (existing) {
-        await prisma.license.update({
-          where: { id: existing.id },
-          data: {
-            status: "ACTIVE",
-            plan: "PRO"
-          }
-        })
-
-        console.log("🔄 Licencia actualizada")
-      } else {
-        await prisma.license.create({
-          data: {
-            userId,
-            role: "DOCTOR",
-            status: "ACTIVE",
-            plan: "PRO"
-          }
-        })
-
-        console.log("🆕 Licencia creada")
-      }
-
-    } catch (err) {
-      console.error("❌ Error actualizando licencia:", err)
-    }
-  }
-
   return NextResponse.json({ received: true })
 }

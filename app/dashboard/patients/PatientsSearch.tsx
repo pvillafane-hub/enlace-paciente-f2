@@ -12,6 +12,7 @@ interface Patient {
     docType: string
     facility: string
     studyDate: string
+    diffDays: number | null
     createdAt: string
   } | null
 }
@@ -50,15 +51,7 @@ export default function PatientsSearch({ patients }: { patients: Patient[] }) {
 
           const isHighNeed = p.riskScore >= 70
 
-          let diffDays = null
-
-          if (p.lastDoc?.createdAt) {
-            const now = Date.now()
-            diffDays = Math.floor(
-              (now - new Date(p.lastDoc.createdAt).getTime()) /
-              (1000 * 60 * 60 * 24)
-            )
-          }
+          const diffDays = p.lastDoc?.diffDays ?? null
 
           return (
 
@@ -85,7 +78,7 @@ export default function PatientsSearch({ patients }: { patients: Patient[] }) {
                 {/* 🔥 BADGE ALTA NECESIDAD */}
                 {isHighNeed && (
                   <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-1 rounded mt-1">
-                    Paciente de alta necesidad
+                    Actividad documental alta
                   </span>
                 )}
 

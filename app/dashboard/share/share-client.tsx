@@ -98,7 +98,7 @@ export default function ShareClient({
           >
             <option value="1">24 horas</option>
             <option value="7">7 días</option>
-            <option value="30">30 días</option>
+
           </select>
         </label>
 

@@ -27,7 +27,7 @@ async function requireAdmin() {
 // 🔥 ACTIVAR / DESACTIVAR USUARIO
 export async function toggleUserActive(userId: string) {
 
-  await requireAdmin()
+  const admin = await requireAdmin()
 
   const user = await prisma.user.findUnique({
     where: { id: userId }
@@ -40,11 +40,10 @@ export async function toggleUserActive(userId: string) {
     throw new Error("No puedes desactivar un admin")
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      active: !user.active
-    }
+  await prisma.$transaction(async tx => {
+    await tx.user.update({ where: { id: userId }, data: { active: !user.active } })
+    await tx.session.deleteMany({ where: { userId } })
+    await tx.auditLog.create({ data: { userId: admin.id, action: 'USER_ACTIVE_CHANGED', entityId: userId, metadata: { active: !user.active } } })
   })
 
   revalidatePath("/dashboard/admin/users")
@@ -56,7 +55,7 @@ export async function changeUserRole(
   newRole: "PATIENT" | "DOCTOR"
 ) {
 
-  await requireAdmin()
+  const admin = await requireAdmin()
 
   const user = await prisma.user.findUnique({
     where: { id: userId }
@@ -75,6 +74,8 @@ export async function changeUserRole(
   if (user.role === newRole) return
 
   await prisma.$transaction(async (tx) => {
+    await tx.session.deleteMany({ where: { userId } })
+    await tx.auditLog.create({ data: { userId: admin.id, action: 'USER_ROLE_CHANGED', entityId: userId } })
 
     await tx.user.update({
       where: { id: userId },
@@ -105,7 +106,7 @@ export async function assignUserAsStaff(
   formData: FormData
 ) {
 
-  await requireAdmin()
+  const admin = await requireAdmin()
 
   const doctorId = formData.get("doctorId")
 
@@ -134,6 +135,8 @@ export async function assignUserAsStaff(
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.session.deleteMany({ where: { userId } })
+    await tx.auditLog.create({ data: { userId: admin.id, action: 'USER_ROLE_CHANGED', entityId: userId } })
 
     // 1. Convertir usuario a STAFF
     await tx.user.update({

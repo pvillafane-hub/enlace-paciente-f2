@@ -1,143 +1,31 @@
-import { prisma } from '@/lib/prisma'
-
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
+import { prisma } from '@/lib/prisma'
+import { webauthnConfig } from '@/config/webauthn'
 
-// 🔥 helper fuera del handler (evita error ES5)
-const base64urlToBase64 = (base64url: string) => {
-  return base64url
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(Math.ceil(base64url.length / 4) * 4, '=')
-}
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') return res.status(405).end()
+  const id = req.cookies.pp_session
+  if (!id || typeof req.body?.id !== 'string') return res.status(401).json({ error: 'Unauthorized' })
   try {
-    const db = prisma
-    const body = req.body
-
-    // 🔐 Obtener sesión
-    const sessionId = req.cookies.pp_session
-
-    if (!sessionId) {
-      return res.status(401).json({ error: 'No session' })
-    }
-
-    const session = await db.session.findUnique({
-      where: { id: sessionId },
+    const session = await prisma.session.findUnique({ where: { id } })
+    if (!session || session.userId || !session.challenge || !session.challengeExpiresAt || session.challengeExpiresAt <= new Date() || session.expiresAt <= new Date()) return res.status(400).json({ error: 'Challenge expired' })
+    const method = await prisma.authMethod.findUnique({ where: { credentialId: req.body.id }, include: { user: true } })
+    if (!method?.user.active || (method.user.passwordChangedAt && method.user.passwordChangedAt >= session.createdAt)) return res.status(401).json({ error: 'Unauthorized' })
+    const { origin, rpID } = webauthnConfig()
+    const verification = await verifyAuthenticationResponse({ response: req.body, expectedChallenge: session.challenge, expectedOrigin: origin, expectedRPID: rpID, requireUserVerification: true, credential: { id: method.credentialId, publicKey: Buffer.from(method.publicKey, 'base64'), counter: method.counter } })
+    if (!verification.verified) return res.status(400).json({ error: 'Verification failed' })
+    const newSession = await prisma.$transaction(async tx => {
+      const consumed = await tx.session.deleteMany({ where: { id, challenge: session.challenge, expiresAt: { gt: new Date() }, challengeExpiresAt: { gt: new Date() } } })
+      if (consumed.count !== 1) throw new Error('Challenge consumed')
+      if (!await tx.user.findFirst({ where: { id: method.userId, active: true, OR: [{ passwordChangedAt: null }, { passwordChangedAt: { lt: session.createdAt } }] }, select: { id: true } })) throw new Error('User unavailable')
+      const updated = await tx.authMethod.updateMany({ where: { id: method.id, counter: method.counter }, data: { counter: verification.authenticationInfo.newCounter, lastUsedAt: new Date() } })
+      if (updated.count !== 1) throw new Error('Credential changed')
+      const created = await tx.session.create({ data: { userId: method.userId, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } })
+      await tx.auditLog.create({ data: { userId: method.userId, action: 'PASSKEY_LOGIN' } })
+      return created
     })
-
-    if (!session || !session.challenge || session.expiresAt <= new Date()) {
-      return res.status(400).json({ error: 'Challenge missing' })
-    }
-
-    const expectedChallenge = session.challenge
-
-    // 🔥 Normalizar ID
-    const normalizedId = base64urlToBase64(body.id)
-
-
-    // 🔥 BUSCAR DE DOS FORMAS (CLAVE)
-    let method = await db.authMethod.findFirst({
-      where: {
-        credentialId: body.id,
-      },
-    })
-
-    if (!method) {
-      method = await db.authMethod.findFirst({
-        where: {
-          credentialId: normalizedId,
-        },
-      })
-    }
-
-    if (!method) {
-      console.warn("⚠️ Passkey no registrada en el sistema")
-
-      return res.status(400).json({
-        error: 'Esta passkey no está registrada. Activa Entrar Fácil primero.',
-      })
-    }
-
-    const user = await db.user.findUnique({ where: { id: method.userId } })
-    if (!user?.active) return res.status(401).json({ error: 'Unauthorized' })
-
-    // 🔥 FIX REAL (PROD vs LOCAL)
-    const isProd = process.env.NODE_ENV === 'production'
-
-    const origin = isProd
-      ? 'https://enlace-salud-seven.vercel.app'
-      : 'http://localhost:3000'
-
-    const rpID = isProd
-      ? 'enlace-salud-seven.vercel.app'
-      : 'localhost'
-
-
-    const verification = await verifyAuthenticationResponse({
-      response: body,
-      expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
-      credential: {
-        id: method.credentialId,
-        publicKey: Buffer.from(method.publicKey, 'base64'),
-        counter: method.counter,
-      },
-    })
-
-    if (!verification.verified) {
-      console.warn("Passkey verification failed")
-      return res.status(400).json({
-        error: 'Verification failed',
-      })
-    }
-
-    // 🔐 Limpiar challenge
-    await db.session.update({
-      where: { id: session.id },
-      data: {
-        challenge: null,
-      },
-    })
-
-    // 🔁 actualizar contador
-    await db.authMethod.update({
-      where: { id: method.id },
-      data: {
-        counter: verification.authenticationInfo.newCounter,
-        lastUsedAt: new Date(),
-      },
-    })
-
-    // 🔐 nueva sesión
-    const newSession = await db.session.create({
-      data: {
-        userId: method.userId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
-    })
-
-    const isProdCookie = process.env.NODE_ENV === 'production'
-
-    res.setHeader('Set-Cookie', [
-      `pp_session=${newSession.id}; Path=/; HttpOnly; ${
-        isProdCookie ? 'Secure;' : ''
-      } SameSite=Lax`,
-    ])
-
+    res.setHeader('Set-Cookie', `pp_session=${newSession.id}; Path=/; HttpOnly; Max-Age=604800; ${process.env.NODE_ENV === 'production' ? 'Secure;' : ''} SameSite=Lax`)
     return res.status(200).json({ ok: true })
-
-  } catch (err) {
-    console.error('🔥 LOGIN FINISH ERROR FULL:', err)
-    return res.status(500).json({ error: 'Internal error' })
-  }
+  } catch { console.error('PASSKEY_LOGIN_FAILED'); return res.status(400).json({ error: 'No se pudo verificar la passkey' }) }
 }

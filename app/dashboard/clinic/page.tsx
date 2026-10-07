@@ -1,3 +1,4 @@
+import { clinicDoctorId } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -16,10 +17,12 @@ export default async function ClinicPage() {
     redirect('/?auth=required')
   }
 
-  const doctorId = session.userId
+  const actor = await prisma.user.findUnique({ where: { id: session.userId } })
+  const doctorId = actor ? await clinicDoctorId(actor) : null
+  if (!doctorId) redirect('/dashboard')
 
   const patients = await prisma.doctorPatient.findMany({
-    where: { doctorId },
+    where: { doctorId, patient: { role: "PATIENT", active: true } },
     include: {
       patient: true
     },

@@ -218,7 +218,7 @@ export default function UploadPage() {
               ref={fileRef}
               type="file"
               name="file"
-              accept="image/*,.pdf"
+              accept="image/jpeg,image/png,image/webp,.pdf"
               onChange={async (e) => {
                 const file = e.target.files?.[0]
                 if (!file) return
@@ -245,7 +245,7 @@ export default function UploadPage() {
               className="mt-3 block w-full"
             />
 
-            <p className="text-gray-600">{fileName}</p>
+            <p className="text-gray-600">{fileName}</p><p className="text-sm text-gray-500">PDF, JPEG, PNG o WebP; máximo 4 MB.</p>
 
             {errors.file && (
               <p className="mt-2 text-red-700 font-semibold">

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
@@ -5,15 +6,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { s3 } from '@/lib/s3'
 
-let prisma: any
-
-async function getPrisma() {
-  if (!prisma) {
-    const { PrismaClient } = await import('@prisma/client')
-    prisma = new PrismaClient()
-  }
-  return prisma
-}
+import { prisma } from '@/lib/prisma'
 
 function MessagePage({
   title,
@@ -34,12 +27,12 @@ function MessagePage({
         </p>
 
         <div className="mt-6">
-          <a
+          <Link
             href="/"
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl text-lg font-semibold hover:bg-blue-700 transition"
           >
             Enlace Salud
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -52,7 +45,7 @@ export default async function SharedDocumentPage({
   params: Promise<{ token: string }>
 }) {
 
-  const db = await getPrisma()
+  const db = prisma
 
   // 🔥 FIX Next 16
   const { token } = await params
@@ -68,7 +61,7 @@ export default async function SharedDocumentPage({
 
   const share = await db.shareLink.findUnique({
     where: { token },
-    include: { document: true },
+    include: { document: { include: { user: { select: { active: true } } } } },
   })
 
   // 🔐 1️⃣ Token no existe
@@ -92,7 +85,7 @@ export default async function SharedDocumentPage({
   }
 
   // 📁 3️⃣ Documento eliminado
-  if (!share.document || share.document.deletedAt) {
+  if (!share.document || share.document.deletedAt || !share.document.user.active) {
     return (
       <MessagePage
         title="📄 Documento no disponible"

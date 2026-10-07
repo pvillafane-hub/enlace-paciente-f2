@@ -3,33 +3,24 @@
 import { prisma } from '@/lib/prisma'
 import { hashPassword, setSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers' // 👈 NUEVO
+import { validPassword, PASSWORD_ERROR } from '@/lib/password-policy'
+import { allowAttempt } from '@/lib/rate-limit'
+import { clearSession } from '@/lib/auth'
 
 export async function signup(
   prevState: { error?: string } | null,
   formData: FormData
 ) {
   const fullName = formData.get('fullName') as string
-  const email = (formData.get('email') as string)?.toLowerCase()
+  const email = (formData.get('email') as string)?.trim().toLowerCase()
   const password = formData.get('password') as string
 
   if (!fullName || !email || !password) {
     return { error: 'Todos los campos son requeridos.' }
   }
 
-  // reglas de password
-  if (
-    password.length < 8 ||
-    !/[A-Z]/.test(password) ||
-    !/[a-z]/.test(password) ||
-    !/[0-9]/.test(password) ||
-    !/[^A-Za-z0-9]/.test(password)
-  ) {
-    return {
-      error:
-        'La contraseña debe tener al menos 8 caracteres, mayúscula, minúscula, número y símbolo.',
-    }
-  }
+  if (!validPassword(password)) return { error: PASSWORD_ERROR }
+  if (!await allowAttempt('signup', email, 3)) return { error: 'Intente más tarde.' }
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -49,9 +40,7 @@ export async function signup(
     },
   })
 
-  // 🔴 LIMPIAR cualquier sesión anterior (CRÍTICO)
- const cookieStore = await cookies()
- cookieStore.delete('pp_session')
+  await clearSession()
 
   // 🟢 CREAR sesión nueva
   await setSession(user.id)

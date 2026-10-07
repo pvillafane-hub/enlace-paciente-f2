@@ -1,10 +1,10 @@
 'use client'
 
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { signup } from './actions'
 
 export default function SignupPage() {
-  const [state, formAction] = useFormState(signup, null)
+  const [state, formAction] = useActionState(signup, null)
 
   return (
     <div className="max-w-md mx-auto mt-16 bg-white p-6 rounded-xl border">

@@ -1,3 +1,4 @@
+import { canReadPatient } from '@/lib/access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
@@ -21,9 +22,12 @@ export default async function MedicationsPage({
     redirect("/dashboard")
   }
 
+  const actor = await prisma.user.findUnique({ where: { id: session.userId } })
+  if (!actor || !await canReadPatient(actor, patientId)) redirect('/dashboard')
+
   const patient = await prisma.user.findUnique({
     where: { id: patientId },
-    include: { documents: true }
+    include: { documents: { where: { deletedAt: null, docType: 'Medicamentos' } } }
   })
 
   if (!patient) {

@@ -27,7 +27,7 @@ export default async function ShareDocumentPage({
     where: { id },
   })
 
-  if (!doc) {
+  if (!doc || doc.deletedAt) {
     return (
       <div className="p-10 text-center">
         Documento no encontrado

@@ -11,6 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  if (!await prisma.user.findFirst({ where: { id: session.userId, active: true, role: 'PATIENT' }, select: { id: true } })) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+
   // 🔐 token seguro
   const token = crypto.randomBytes(16).toString("hex")
 

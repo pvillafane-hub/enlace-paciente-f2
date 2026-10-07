@@ -1,3 +1,4 @@
+import { sendRequest } from './actions'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -10,63 +11,7 @@ import QRScannerClient from './QRScannerClient'
 
 async function requestAccess(formData: FormData) {
   'use server'
-
-  const session = await getValidatedSession()
-
-  if (!session?.userId) {
-    throw new Error("Unauthorized")
-  }
-
-  const doctorId = session.userId
-
-  const doctor = await prisma.user.findUnique({
-    where: { id: doctorId }
-  })
-
-  if (!doctor || doctor.role !== 'DOCTOR') {
-    throw new Error("Unauthorized")
-  }
-
-  const email = String(formData.get('email') || '')
-    .toLowerCase()
-    .trim()
-
-  if (!email) return
-
-  const patient = await prisma.user.findUnique({
-    where: { email }
-  })
-
-  if (!patient || patient.role !== 'PATIENT') {
-    return
-  }
-
-  const alreadyAuthorized = await prisma.doctorPatient.findFirst({
-    where: {
-      doctorId,
-      patientId: patient.id
-    }
-  })
-
-  if (alreadyAuthorized) return
-
-  const existingRequest = await prisma.medicalAccessRequest.findFirst({
-    where: {
-      doctorId,
-      patientId: patient.id
-    }
-  })
-
-  if (existingRequest) return
-
-  await prisma.medicalAccessRequest.create({
-    data: {
-      doctorId,
-      patientId: patient.id
-    }
-  })
-
-  revalidatePath('/dashboard/requests')
+  await sendRequest(String(formData.get('email') || ''))
 }
 
 // ==============================

@@ -277,7 +277,7 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
                       </button>
 
                       <a
-                        href={`/share/${doc.id}`}
+                        href={`/dashboard/share/${doc.id}`}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-lg"
                       >
                         Enviar a mi médico

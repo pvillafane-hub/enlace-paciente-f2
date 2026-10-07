@@ -38,17 +38,11 @@ export default async function handler(
       return res.status(404).json({ error: 'Document not found' })
     }
 
-    // 🧹 Eliminar enlaces compartidos asociados
-    await prisma.shareLink.deleteMany({
-      where: { documentId },
-    })
-
-    // 🗂 Soft delete (no borrar físicamente)
-    await prisma.document.update({
-      where: { id: documentId },
-      data: {
-        deletedAt: new Date()
-      }
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "Document" WHERE "id" = ${documentId} FOR UPDATE`
+      await tx.document.updateMany({ where: { id: documentId, userId: session.userId, deletedAt: null }, data: { deletedAt: new Date() } })
+      await tx.shareLink.deleteMany({ where: { documentId } })
+      await tx.auditLog.create({ data: { userId: session.userId, action: 'DOCUMENT_DELETED', entityId: documentId } })
     })
 
     return res.status(200).json({ ok: true })

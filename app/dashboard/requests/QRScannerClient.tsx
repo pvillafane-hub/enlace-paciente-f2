@@ -21,7 +21,7 @@ export default function QRScannerClient() {
     scanner.render(
       async (decodedText: string) => {
 
-        console.log("QR leído:", decodedText)
+
 
         try {
 

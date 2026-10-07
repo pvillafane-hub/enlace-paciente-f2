@@ -1,3 +1,5 @@
+import { canReadPatient } from '@/lib/access'
+import { auditLog } from '@/lib/audit'
 import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
@@ -68,29 +70,7 @@ export default async function handler(
       })
     }
 
-    // 🔐 VALIDAR ACCESO
-    const isOwner = document.userId === userId
-
-    if (!isOwner) {
-      if (!["DOCTOR", "STAFF"].includes(session.user.role)) return res.status(403).json({ error: "Acceso denegado" })
-      const relation = await prisma.doctorPatient.findFirst({
-        where: {
-          doctorId: session.user.role === 'STAFF'
-            ? (await prisma.clinicStaff.findFirst({ where: { staffId: userId, active: true, doctor: { active: true, role: 'DOCTOR' } } }))?.doctorId ?? '__denied__'
-            : userId,
-          patientId: document.userId
-        }
-      })
-
-      if (!relation) {
-        console.warn("ACCESS DENIED:", {
-          userId,
-          documentId: id,
-        })
-
-        return res.status(403).json({ error: "Acceso denegado" })
-      }
-    }
+    if (!await canReadPatient(session.user, document.userId)) return res.status(403).json({ error: 'Acceso denegado' })
 
     // ☁️ GENERAR SIGNED URL
     const command = new GetObjectCommand({
@@ -102,10 +82,7 @@ export default async function handler(
       expiresIn: 60 // ⏱️ 1 minuto
     })
 
-    console.log("DOCUMENT VIEW:", {
-      userId,
-      documentId: id,
-    })
+    await auditLog({ userId, action: 'DOCUMENT_VIEW', entityId: id })
 
     res.setHeader('Cache-Control', 'private, no-store')
     // 🔄 REDIRECT

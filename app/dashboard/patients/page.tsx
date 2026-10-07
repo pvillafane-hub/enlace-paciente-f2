@@ -1,3 +1,4 @@
+import { clinicDoctorId } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -11,16 +12,20 @@ export default async function PatientsPage() {
     redirect('/?auth=required')
   }
 
-  const doctorId = session.userId
+  const actor = await prisma.user.findUnique({ where: { id: session.userId } })
+  const doctorId = actor ? await clinicDoctorId(actor) : null
+  if (!doctorId) redirect('/dashboard')
 
   const patientsData = await prisma.doctorPatient.findMany({
     where: {
-      doctorId
+      doctorId,
+      patient: { active: true, role: "PATIENT" }
     },
     include: {
       patient: {
         include: {
           documents: {
+            where: { deletedAt: null },
             orderBy: {
               createdAt: 'desc'
             },
@@ -45,7 +50,7 @@ export default async function PatientsPage() {
       )
 
       const recent30 = docs.filter(d =>
-        new Date(d.createdAt).getTime() > last30Days
+        new Date(d.createdAt).getTime() > last30Days && new Date(d.createdAt).getTime() <= last7Days
       )
 
       // 🔥 SCORE
@@ -62,33 +67,6 @@ export default async function PatientsPage() {
 
       // 🔥 NUEVO: clasificación clínica correcta
       const isHighNeed = score >= 70
-
-      // 🚨 ALERTA AUTOMÁTICA
-      if (score >= 80) {
-
-        const existingAlert = await prisma.auditLog.findFirst({
-          where: {
-            action: "HIGH_RISK_PATIENT",
-            userId: p.patient.id,
-            createdAt: {
-              gte: new Date(Date.now() - 60 * 60 * 1000)
-            }
-          }
-        })
-
-        if (!existingAlert) {
-          await prisma.auditLog.create({
-            data: {
-              action: "HIGH_RISK_PATIENT",
-              userId: p.patient.id,
-              metadata: {
-                score,
-                reason: "High activity in short period"
-              }
-            }
-          })
-        }
-      }
 
       const lastDoc = docs[0]
 

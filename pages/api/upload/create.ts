@@ -1,222 +1,58 @@
-import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import formidable from 'formidable'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import fs from 'fs'
+import formidable, { type Fields, type Files } from 'formidable'
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { readFile, unlink } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { parse } from "cookie"
+import { s3 } from '@/lib/s3'
+import { getApiSession } from '@/lib/api-auth'
+import { canReadPatient } from '@/lib/access'
+import { MAX_UPLOAD_BYTES, detectDocumentType, validDateOnly } from '@/lib/file-policy'
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-})
+export const config = { api: { bodyParser: false } }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' })
-  }
-
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
   const session = await getApiSession(req.cookies.pp_session)
-  if (!session) return res.status(401).json({ error: "No autorizado" })
-
-  const form = formidable({ multiples: false, maxFiles: 1, maxFileSize: 10 * 1024 * 1024, maxTotalFileSize: 10 * 1024 * 1024 })
-
-  form.parse(req, async (err, fields, files) => {
-
+  if (!session) return res.status(401).json({ error: 'No autorizado' })
+  const paths = new Set<string>()
+  const form = formidable({ multiples: false, maxFiles: 1, maxFileSize: MAX_UPLOAD_BYTES, maxTotalFileSize: MAX_UPLOAD_BYTES, maxFields: 10, maxFieldsSize: 8192, allowEmptyFiles: false })
+  form.on('fileBegin', (_name, file) => paths.add(file.filepath))
+  try {
+    let parsed: [Fields, Files]
+    try { parsed = await form.parse(req) }
+    catch { return res.status(400).json({ error: 'Archivo inválido; el máximo es 4 MB' }) }
+    const [fields, files] = parsed
+    const value = (key: string) => fields[key]?.[0]?.trim() ?? ''
+    const patientId = value('patientId') || session.userId
+    if (!await canReadPatient(session.user, patientId)) return res.status(403).json({ error: 'Acceso denegado' })
+    const docType = value('docType'), facility = value('facility'), studyDate = value('studyDate')
+    const bodyPart = value('bodyPart').toLowerCase(), specialty = value('specialty').toLowerCase()
+    if (!docType || docType.length > 80 || !facility || facility.length > 200 || !validDateOnly(studyDate)) return res.status(400).json({ error: 'Verifique tipo, institución y fecha del estudio' })
+    if (['radiografia', 'imagenes'].includes(docType.toLowerCase()) && !['cabeza','cuello','pecho','abdomen','extremidades'].includes(bodyPart)) return res.status(400).json({ error: 'Seleccione una parte del cuerpo válida' })
+    if (docType.toLowerCase() === 'laboratorio' && !['cardiologia','endocrinologia','nefrologia','hematologia_oncologia','urologia','reumatologia','neumologia','geriatria','pediatria'].includes(specialty)) return res.status(400).json({ error: 'Seleccione una especialidad válida' })
+    const file = files.file?.[0]
+    if (!file || Object.keys(files).length !== 1 || file.size > MAX_UPLOAD_BYTES) return res.status(400).json({ error: 'Seleccione un único archivo de hasta 4 MB' })
+    const bytes = await readFile(file.filepath)
+    const contentType = detectDocumentType(bytes)
+    if (!contentType || bytes.length > MAX_UPLOAD_BYTES) return res.status(400).json({ error: 'Solo PDF, JPEG, PNG y WebP' })
+    const bucket = process.env.AWS_BUCKET_NAME
+    if (!bucket) return res.status(503).json({ error: 'Almacenamiento no disponible' })
+    const key = `documents/${randomUUID()}`
+    const filename = (file.originalFilename || 'documento').replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 180)
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: contentType, ServerSideEncryption: 'AES256' }))
     try {
-
-      if (err) {
-        console.error(err)
-        return res.status(500).json({ error: 'Error procesando archivo' })
-      }
-
-      const currentUser = session.user
-
-      // 🔹 NORMALIZAR CAMPOS
-      const getValue = (f: any) => Array.isArray(f) ? f[0] : f
-
-      const docType = getValue(fields.docType)
-      const facility = getValue(fields.facility)
-      const studyDate = getValue(fields.studyDate)
-      const bodyPart = getValue(fields.bodyPart)
-      const specialty = getValue(fields.specialty)
-      const patientId = getValue(fields.patientId) // 🔥 NUEVO: paciente destino
-
-      const normalizedDocType = docType?.toLowerCase()
-      const normalizedBodyPart = bodyPart?.toLowerCase().trim()
-      const normalizedSpecialty = specialty?.toLowerCase().trim()
-
-      // 🔐 DETERMINAR A QUIÉN SE LE SUBE EL DOCUMENTO
-      let targetUserId = session.userId
-
-      if (patientId && typeof patientId === "string") {
-
-        const isDoctor = currentUser.role === "DOCTOR"
-        const isStaff = currentUser.role === "STAFF"
-
-        if (!isDoctor && !isStaff) {
-          return res.status(403).json({
-            error: "No autorizado para subir documentos a otro paciente",
-          })
-        }
-
-        let doctorId = currentUser.id
-
-        if (isStaff) {
-          const staffRelation = await prisma.clinicStaff.findFirst({
-            where: {
-              staffId: currentUser.id,
-              active: true,
-            },
-          })
-
-          if (!staffRelation) {
-            return res.status(403).json({
-              error: "Este staff no está asignado a un doctor activo",
-            })
-          }
-
-          doctorId = staffRelation.doctorId
-        }
-
-        const access = await prisma.doctorPatient.findFirst({
-          where: {
-            doctorId,
-            patientId,
-          },
-        })
-
-        if (!access) {
-          return res.status(403).json({
-            error: "No autorizado para subir documentos a este paciente",
-          })
-        }
-
-        const patient = await prisma.user.findUnique({
-          where: { id: patientId },
-        })
-
-        if (!patient || patient.role !== "PATIENT" || !patient.active) {
-          return res.status(400).json({
-            error: "Paciente inválido o inactivo",
-          })
-        }
-
-        targetUserId = patientId
-      }
-
-      // 🔹 VALIDACIÓN CLÍNICA
-      const isImaging =
-        normalizedDocType === "radiografia" ||
-        normalizedDocType === "imagenes"
-
-      const isLab =
-        normalizedDocType === "laboratorio"
-
-      const allowedBodyParts = [
-        "cabeza",
-        "cuello",
-        "pecho",
-        "abdomen",
-        "extremidades",
-      ]
-
-      const allowedSpecialties = [
-        "cardiologia",
-        "endocrinologia",
-        "nefrologia",
-        "hematologia_oncologia",
-        "urologia",
-        "reumatologia",
-        "neumologia",
-        "geriatria",
-        "pediatria",
-      ]
-
-      if (
-        isImaging &&
-        (!normalizedBodyPart ||
-          !allowedBodyParts.includes(normalizedBodyPart))
-      ) {
-        return res.status(400).json({
-          error: "Debe seleccionar una opción válida del cuerpo",
-        })
-      }
-
-      if (
-        isLab &&
-        (!normalizedSpecialty ||
-          !allowedSpecialties.includes(normalizedSpecialty))
-      ) {
-        return res.status(400).json({
-          error: "Debe seleccionar una especialidad válida",
-        })
-      }
-
-      // 📁 ARCHIVO
-      const file = Array.isArray(files.file) ? files.file[0] : files.file
-
-      if (!file) {
-        return res.status(400).json({ error: 'Archivo requerido' })
-      }
-
-      const fileStream = fs.createReadStream(file.filepath)
-      const fileKey = `documents/${Date.now()}-${file.originalFilename}`
-
-      const bucket = process.env.AWS_BUCKET_NAME
-
-      if (!bucket) {
-        throw new Error("AWS_BUCKET_NAME no está definido")
-      }
-
-      // 🔥 S3 UPLOAD
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: fileKey,
-          Body: fileStream,
-          ContentType: file.mimetype || 'application/octet-stream',
-        })
-      )
-
-      // 💾 DB
-      const document = await prisma.document.create({
-        data: {
-          userId: targetUserId, // 🔥 FIX CLAVE: paciente destino, no siempre doctor
-          docType: docType as string,
-          facility: facility as string,
-          studyDate: studyDate as string,
-          filename: file.originalFilename || 'documento',
-          filePath: fileKey,
-          bodyPart: normalizedBodyPart || null,
-          specialty: normalizedSpecialty || null,
-        },
+      const document = await prisma.$transaction(async tx => {
+        const created = await tx.document.create({ data: { userId: patientId, docType, facility, studyDate, filename, filePath: key, bodyPart: bodyPart || null, specialty: specialty || null } })
+        await tx.auditLog.create({ data: { userId: session.userId, action: 'DOCUMENT_UPLOADED', entityId: created.id } })
+        return created
       })
-
-      return res.status(200).json({
-        success: true,
-        document,
-        uploadedForUserId: targetUserId,
-      })
-
-    } catch (error) {
-
-      console.error("UPLOAD ERROR:", error)
-
-      return res.status(500).json({
-        error: 'Error interno del servidor',
-      })
+      return res.status(200).json({ success: true, document, uploadedForUserId: patientId })
+    } catch {
+      try { await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })) }
+      catch { console.error('UPLOAD_COMPENSATION_FAILED', { objectKey: key }) }
+      throw new Error('Document persistence failed')
     }
-
-  })
+  } catch { console.error('UPLOAD_FAILED'); return res.status(500).json({ error: 'No se pudo guardar el documento' }) }
+  finally { await Promise.allSettled(Array.from(paths).map(path => unlink(path))) }
 }
