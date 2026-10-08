@@ -2,6 +2,7 @@ import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { Role } from "@prisma/client"
+import ConfirmUserForm from "./ConfirmUserForm"
 import {
   toggleUserActive,
   changeUserRole,
@@ -173,25 +174,26 @@ export default async function AdminUsersPage({
                         <div className="flex gap-2 flex-wrap">
 
                           {u.role !== Role.PATIENT && (
-                            <form action={changeUserRole.bind(null, u.id, "PATIENT")}>
+                            <ConfirmUserForm action={changeUserRole.bind(null, u.id, "PATIENT")} message={`Cambiar ${u.fullName} (${u.email}) de ${u.role} a Paciente. Se cerrarán sus sesiones y se desactivarán sus asignaciones como Staff.`}>
                               <button className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
                                 Hacer Paciente
                               </button>
-                            </form>
+                            </ConfirmUserForm>
                           )}
 
                           {u.role !== Role.DOCTOR && (
-                            <form action={changeUserRole.bind(null, u.id, "DOCTOR")}>
+                            <ConfirmUserForm action={changeUserRole.bind(null, u.id, "DOCTOR")} message={`Cambiar ${u.fullName} (${u.email}) de ${u.role} a Doctor. Tendrá las funciones de Doctor, sujetas a sus permisos y licencia. Se cerrarán sus sesiones y se desactivarán sus asignaciones como Staff.`}>
                               <button className="text-xs bg-blue-100 px-2 py-1 rounded hover:bg-blue-200">
                                 Hacer Doctor
                               </button>
-                            </form>
+                            </ConfirmUserForm>
                           )}
 
                         </div>
 
                         {u.role !== Role.STAFF && (
-                          <form
+                          <ConfirmUserForm
+                            message={`Asignar ${u.fullName} (${u.email}) como Staff. Su cuenta quedará activa, tendrá acceso según los permisos del doctor seleccionado y se reemplazarán sus asignaciones anteriores como Staff. Se cerrarán sus sesiones.`}
                             action={assignUserAsStaff.bind(null, u.id)}
                             className="flex gap-2 items-center flex-wrap"
                           >
@@ -213,11 +215,12 @@ export default async function AdminUsersPage({
                             <button className="text-xs bg-purple-100 px-2 py-1 rounded hover:bg-purple-200">
                               Hacer Staff
                             </button>
-                          </form>
+                          </ConfirmUserForm>
                         )}
 
                         {u.role === Role.STAFF && (
-                          <form
+                          <ConfirmUserForm
+                            message={`Asignar ${u.fullName} (${u.email}) como Staff. Su cuenta quedará activa, tendrá acceso según los permisos del doctor seleccionado y se reemplazarán sus asignaciones anteriores como Staff. Se cerrarán sus sesiones.`}
                             action={assignUserAsStaff.bind(null, u.id)}
                             className="flex gap-2 items-center flex-wrap"
                           >
@@ -239,7 +242,7 @@ export default async function AdminUsersPage({
                             <button className="text-xs bg-purple-100 px-2 py-1 rounded hover:bg-purple-200">
                               Cambiar doctor
                             </button>
-                          </form>
+                          </ConfirmUserForm>
                         )}
 
                       </div>
@@ -287,11 +290,11 @@ export default async function AdminUsersPage({
                   </td>
 
                   <td className="p-3 space-y-2">
-                    <form action={toggleUserActive.bind(null, u.id)}>
+                    <ConfirmUserForm action={toggleUserActive.bind(null, u.id, u.active)} message={`${u.active ? "Desactivar" : "Activar"} a ${u.fullName} (${u.email}). ${u.active ? "No podrá iniciar sesión mientras esté inactiva." : "Podrá iniciar sesión con sus permisos actuales."} Se cerrarán sus sesiones.`}>
                       <button className="text-blue-600 underline">
                         {u.active ? "Desactivar" : "Activar"}
                       </button>
-                    </form>
+                    </ConfirmUserForm>
                   </td>
 
                 </tr>

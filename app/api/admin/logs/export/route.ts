@@ -17,9 +17,9 @@ export async function GET(req: Request) {
     ...(from || to ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
   }
   const logs = await prisma.auditLog.findMany({ where, include: { user: { select: { email: true } } }, orderBy: { createdAt: 'desc' }, take: 5001 })
-  const rows = logs.slice(0, 5000).map(log => [log.user.email, log.action, log.metadata ? JSON.stringify(log.metadata) : '', log.createdAt.toISOString()].map(csvCell).join(','))
+  const rows = logs.slice(0, 5000).map(log => [log.user.email, log.action, log.entityId ?? '', log.metadata ? JSON.stringify(log.metadata) : '', log.createdAt.toISOString()].map(csvCell).join(','))
   await prisma.auditLog.create({ data: { userId: admin.id, action: 'AUDIT_EXPORTED', metadata: { count: rows.length } } })
-  return new NextResponse('Usuario,Accion,Detalle,Fecha\n' + rows.join('\n'), { headers: {
+  return new NextResponse('Usuario,Accion,Entidad,Detalle,Fecha\n' + rows.join('\n'), { headers: {
     'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=logs.csv',
     'Cache-Control': 'private, no-store', 'X-Export-Truncated': String(logs.length > 5000),
   } })

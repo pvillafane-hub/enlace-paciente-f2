@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { Role } from "@prisma/client"
+import { Role, type Prisma } from "@prisma/client"
 
 export default async function AdminLogsPage({
   searchParams,
@@ -38,7 +38,7 @@ export default async function AdminLogsPage({
   const { search, from, to } = await searchParams
 
   // 🔍 Filtros dinámicos
-  const where: any = {}
+  const where: Prisma.AuditLogWhereInput = {}
 
   if (search) {
     where.user = {
@@ -139,6 +139,7 @@ export default async function AdminLogsPage({
             <tr>
               <th className="p-3">Usuario</th>
               <th className="p-3">Acción</th>
+              <th className="p-3">Cuenta o entidad afectada</th>
               <th className="p-3">Detalle</th>
               <th className="p-3">Fecha</th>
             </tr>
@@ -157,10 +158,9 @@ export default async function AdminLogsPage({
                   {log.action}
                 </td>
 
+                <td className="p-3 text-sm break-all">{log.entityId || "—"}</td>
                 <td className="p-3 text-sm text-gray-600">
-                  {log.metadata
-                    ? JSON.stringify(log.metadata)
-                    : "-"}
+                  <details><summary className="cursor-pointer">Ver antes / después y detalles</summary><pre className="whitespace-pre-wrap break-all text-xs mt-2">{log.metadata ? JSON.stringify(log.metadata, null, 2) : "Sin detalles registrados"}</pre></details>
                 </td>
 
                 <td className="p-3 text-sm">
@@ -172,7 +172,7 @@ export default async function AdminLogsPage({
 
             {logs.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-gray-500">
+                <td colSpan={5} className="p-6 text-center text-gray-500">
                   No se encontraron resultados
                 </td>
               </tr>
