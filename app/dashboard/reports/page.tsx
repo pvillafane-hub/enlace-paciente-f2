@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import ActivitySearch from "./ActivitySearch"
+import { reportActivity, inactivityLabel } from "@/lib/report-view"
 
 export const dynamic = "force-dynamic"
 
@@ -23,10 +24,12 @@ export default async function ReportsPage() {
 
   const patients = await prisma.doctorPatient.findMany({
     where: {
-      doctorId: doctor.id
+      doctorId: doctor.id,
+      patient: { active: true, role: "PATIENT" }
     },
-    include: {
-      patient: true
+    select: {
+      patientId: true,
+      patient: { select: { id: true, fullName: true } }
     }
   })
 
@@ -39,14 +42,17 @@ export default async function ReportsPage() {
         in: patientIds
       }
     },
-    include: {
-      user: true
+    select: {
+      id: true, docType: true, specialty: true, bodyPart: true, createdAt: true,
+      user: { select: { fullName: true } }
     },
     orderBy: {
       createdAt: "desc"
     },
     take: 20
   })
+
+  const totalDocuments = await prisma.document.count({ where: { deletedAt: null, userId: { in: patientIds } } })
 
   const documentsByType = await prisma.document.groupBy({
     by: ["docType"],
@@ -88,7 +94,7 @@ export default async function ReportsPage() {
 
     const last = lastActivityMap.get(p.patient.id)
 
-    let daysInactive = 999
+    let daysInactive: number | null = null
 
     if (last) {
       daysInactive = Math.floor(
@@ -103,8 +109,8 @@ export default async function ReportsPage() {
     }
 
   })
-  .filter(p => p.daysInactive >= 30)
-  .sort((a, b) => b.daysInactive - a.daysInactive)
+  .filter(p => p.daysInactive === null || p.daysInactive >= 30)
+  .sort((a, b) => (b.daysInactive ?? Infinity) - (a.daysInactive ?? Infinity))
 
   return (
 
@@ -117,7 +123,7 @@ export default async function ReportsPage() {
         </h1>
 
         <p className="text-gray-500 mt-2">
-          Monitoreo clínico de pacientes y actividad reciente
+          Seguimiento documental de pacientes y actividad reciente
         </p>
 
         <p className="text-sm text-gray-400 mt-1">
@@ -129,9 +135,9 @@ export default async function ReportsPage() {
       <div className="grid md:grid-cols-4 gap-6">
 
         <StatCard title="Pacientes activos" value={patients.length} />
-        <StatCard title="Estudios registrados" value={documents.length} />
+        <StatCard title="Estudios registrados" value={totalDocuments} />
         <StatCard title="Accesos pendientes" value={pendingRequests} />
-        <StatCard title="Sistema operativo" value="Activo" />
+        <StatCard title="Sin documentos registrados" value={inactivePatients.filter(p => p.daysInactive === null).length} />
 
       </div>
 
@@ -143,7 +149,7 @@ export default async function ReportsPage() {
         </h2>
 
         <p className="text-sm text-gray-500 mb-6">
-          Pacientes sin actividad clínica reciente
+          Pacientes sin cargas de documentos recientes
         </p>
 
         {inactivePatients.length === 0 && (
@@ -156,10 +162,7 @@ export default async function ReportsPage() {
 
           {inactivePatients.map(p => {
 
-            const label =
-              p.daysInactive >= 365
-                ? "Más de 1 año sin actividad"
-                : `Sin actividad en los últimos ${p.daysInactive} días`
+            const label = inactivityLabel(p.daysInactive)
 
             return (
 
@@ -195,15 +198,15 @@ export default async function ReportsPage() {
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="text-xl font-semibold mb-6">
-          Actividad reciente
+          Últimos 20 documentos cargados
         </h2>
 
         {documents.length === 0 ? (
           <p className="text-gray-500">
-            No hay actividad clínica reciente.
+            No hay documentos registrados.
           </p>
         ) : (
-          <ActivitySearch documents={documents} />
+          <ActivitySearch documents={documents.map(reportActivity)} />
         )}
 
       </div>

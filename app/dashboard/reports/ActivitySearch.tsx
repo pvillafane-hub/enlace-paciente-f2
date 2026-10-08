@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import type { ReportActivity } from '@/lib/report-view'
 
-export default function ActivitySearch({ documents }: any) {
+export default function ActivitySearch({ documents }: { documents: ReportActivity[] }) {
 
   const [query, setQuery] = useState("")
 
-  const filtered = documents.filter((doc: any) => {
+  const filtered = documents.filter((doc) => {
 
     const text =
       (doc.user?.fullName || "") +
@@ -42,7 +43,7 @@ export default function ActivitySearch({ documents }: any) {
 
       <div className="space-y-4">
 
-        {filtered.map((doc: any) => (
+        {filtered.map((doc) => (
 
           <div
             key={doc.id}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+
 
 interface Alert {
   id: string
@@ -19,7 +19,7 @@ export default function NotificationBell({
 
   const [alerts, setAlerts] = useState(initialAlerts)
   const [open, setOpen] = useState(false)
-  const router = useRouter()
+
 
   // 🔥 POLLING
   useEffect(() => {
@@ -41,21 +41,6 @@ export default function NotificationBell({
     return () => clearInterval(interval)
 
   }, [])
-
-  // 🔥 RESOLVER ALERTA
-  const handleResolve = async (alertId: string) => {
-    try {
-      await fetch(`/api/alerts/${alertId}/resolve`, {
-        method: "POST"
-      })
-
-      setAlerts(prev => prev.filter(a => a.id !== alertId))
-      router.refresh()
-
-    } catch (e) {
-      console.error("Error resolving alert", e)
-    }
-  }
 
   // 🔥 TRADUCIR ALERTA A TEXTO CLÍNICO
   const getAlertMessage = (type: string) => {
@@ -80,6 +65,7 @@ export default function NotificationBell({
       <button
         onClick={() => setOpen(!open)}
         className="relative text-xl"
+        aria-label="Abrir alertas" aria-expanded={open}
       >
         🔔
 
@@ -115,7 +101,6 @@ export default function NotificationBell({
                 href={`/dashboard/patients/${alert.patientId}`}
                 className="block p-4 hover:bg-gray-50 border-b"
                 onClick={() => {
-                  handleResolve(alert.id)
                   setOpen(false)
                 }}
               >

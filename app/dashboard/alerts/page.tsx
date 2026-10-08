@@ -1,16 +1,15 @@
 import { clinicDoctorId } from '@/lib/access'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { resolveAlert } from './actions'
+import ConfirmUserForm from '../admin/users/ConfirmUserForm'
 
-type AlertWithPatient = Prisma.MedicalAlertGetPayload<{
-  include: { patient: true }
-}>
-
-export default async function AlertsPage() {
+export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ page?: string; historyPage?: string }> }) {
+  const params = await searchParams
+  const pageNumber = (value?: string) => /^\d{1,4}$/.test(value || "") ? Math.max(1, Number(value)) : 1
+  const page = pageNumber(params.page), historyPage = pageNumber(params.historyPage)
 
   const session = await getValidatedSession()
 
@@ -27,22 +26,13 @@ export default async function AlertsPage() {
   const doctorId = actor ? await clinicDoctorId(actor) : null
   if (!doctorId) redirect('/dashboard')
 
-  const alerts: AlertWithPatient[] = await prisma.medicalAlert.findMany({
-    where: {
-      doctorId,
-      patient: { active: true, patientDoctors: { some: { doctorId } } }
-    },
-    include: {
-      patient: true
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 50
-  })
-
-  const activeAlerts = alerts.filter(a => !a.resolved)
-  const resolvedAlerts = alerts.filter(a => a.resolved)
+  const where = { doctorId, patient: { active: true, role: 'PATIENT' as const, patientDoctors: { some: { doctorId } } } }
+  const [activeAlerts, resolvedAlerts, activeCount, resolvedCount] = await Promise.all([
+    prisma.medicalAlert.findMany({ where: { ...where, resolved: false }, include: { patient: true }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50, skip: (page - 1) * 50 }),
+    prisma.medicalAlert.findMany({ where: { ...where, resolved: true }, include: { patient: true }, orderBy: [{ resolvedAt: 'desc' }, { id: 'desc' }], take: 50, skip: (historyPage - 1) * 50 }),
+    prisma.medicalAlert.count({ where: { ...where, resolved: false } }),
+    prisma.medicalAlert.count({ where: { ...where, resolved: true } }),
+  ])
 
   return (
 
@@ -59,12 +49,12 @@ export default async function AlertsPage() {
       <div className="space-y-4">
 
         <h2 className="text-xl font-semibold">
-          Alertas activas
+          Alertas activas ({activeCount})
         </h2>
 
         {activeAlerts.length === 0 && (
           <p className="text-gray-500">
-            No hay alertas activas
+            No hay alertas activas en esta página
           </p>
         )}
 
@@ -84,11 +74,11 @@ export default async function AlertsPage() {
                 🔴 {alert.patient.fullName}
               </Link>
 
-              <form action={resolveAlert.bind(null, alert.id)}>
+              <ConfirmUserForm action={resolveAlert.bind(null, alert.id)} message={`Marcar como resuelta la alerta de ${alert.patient.fullName}. Abrir un expediente no resuelve una alerta automáticamente.`}>
                 <button className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
                   Resolver
                 </button>
-              </form>
+              </ConfirmUserForm>
 
             </div>
 
@@ -106,12 +96,16 @@ export default async function AlertsPage() {
 
       </div>
 
+      <div className="flex gap-4" aria-label="Páginas de alertas activas">
+        {page > 1 && <Link href={`?page=${page - 1}&historyPage=${historyPage}`}>Anteriores</Link>}
+        {page * 50 < activeCount && <Link href={`?page=${page + 1}&historyPage=${historyPage}`}>Siguientes</Link>}
+      </div>
       {/* ✅ RESUELTAS */}
 
       <div className="space-y-4">
 
         <h2 className="text-xl font-semibold">
-          Historial
+          Historial ({resolvedCount})
         </h2>
 
         {resolvedAlerts.length === 0 && (
@@ -147,6 +141,10 @@ export default async function AlertsPage() {
 
       </div>
 
+      <nav className="flex gap-4" aria-label="Páginas del historial">
+        {historyPage > 1 && <Link href={`?page=${page}&historyPage=${historyPage - 1}`}>Anteriores</Link>}
+        {historyPage * 50 < resolvedCount && <Link href={`?page=${page}&historyPage=${historyPage + 1}`}>Siguientes</Link>}
+      </nav>
     </div>
   )
 }

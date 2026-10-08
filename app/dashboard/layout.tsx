@@ -48,10 +48,11 @@ export default async function DashboardLayout({
     const alertsData = await prisma.medicalAlert.findMany({
       where: {
         doctorId: user.id,
-        resolved: false
+        resolved: false,
+        patient: { active: true, role: "PATIENT", patientDoctors: { some: { doctorId: user.id } } }
       },
       include: {
-        patient: true
+        patient: { select: { id: true, fullName: true } }
       },
       orderBy: {
         createdAt: "desc"

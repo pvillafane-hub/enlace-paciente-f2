@@ -187,7 +187,7 @@ export default async function PatientPage({
 
             {latestDoc && (
               <p className="text-sm text-gray-500 mt-2">
-                Última actividad ·{" "}
+                Fecha del estudio más reciente ·{" "}
                 {new Date(latestDoc.studyDate).toLocaleDateString('es-PR')}
               </p>
             )}
@@ -289,7 +289,7 @@ export default async function PatientPage({
           </div>
         ) : (
           <p className="text-gray-500">
-            No hay medicación registrada.
+            No hay documentos de medicamentos registrados.
           </p>
         )}
       </div>

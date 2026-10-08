@@ -11,7 +11,7 @@ export async function resolveAlert(alertId: string) {
   const doctorId = user ? await clinicDoctorId(user) : null
   if (!doctorId || typeof alertId !== 'string') throw new Error('Unauthorized')
   await prisma.$transaction(async tx => {
-    const changed = await tx.medicalAlert.updateMany({ where: { id: alertId, doctorId, resolved: false, patient: { patientDoctors: { some: { doctorId } } } }, data: { resolved: true, resolvedAt: new Date() } })
+    const changed = await tx.medicalAlert.updateMany({ where: { id: alertId, doctorId, resolved: false, patient: { active: true, role: "PATIENT", patientDoctors: { some: { doctorId } } } }, data: { resolved: true, resolvedAt: new Date() } })
     if (changed.count !== 1) throw new Error('Alerta no disponible')
     await tx.auditLog.create({ data: { userId: session.userId, action: 'ALERT_RESOLVED', entityId: alertId } })
   })

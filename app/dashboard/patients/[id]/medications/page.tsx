@@ -47,7 +47,7 @@ export default async function MedicationsPage({
 
       {meds.length === 0 && (
         <p className="text-gray-500">
-          No hay medicamentos registrados.
+          No hay documentos de medicamentos registrados.
         </p>
       )}
 

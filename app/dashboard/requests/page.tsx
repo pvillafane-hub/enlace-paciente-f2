@@ -1,8 +1,9 @@
+import Link from 'next/link'
+import { RequestStatus } from '@prisma/client'
 import { sendRequest } from './actions'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
 import QRScannerClient from './QRScannerClient'
 
 // ==============================
@@ -18,7 +19,10 @@ async function requestAccess(formData: FormData) {
 // 📄 PAGE
 // ==============================
 
-export default async function RequestAccessPage() {
+export default async function RequestAccessPage({ searchParams }: { searchParams: Promise<{ status?: string; page?: string }> }) {
+  const params = await searchParams
+  const status = Object.values(RequestStatus).includes(params.status as RequestStatus) ? params.status as RequestStatus : undefined
+  const page = /^\d{1,4}$/.test(params.page || '') ? Math.max(1, Number(params.page)) : 1
 
   const session = await getValidatedSession()
 
@@ -34,12 +38,13 @@ export default async function RequestAccessPage() {
     redirect('/dashboard')
   }
 
+  const where = { doctorId: user.id, ...(status ? { status } : {}) }
+  const totalRequests = await prisma.medicalAccessRequest.count({ where })
   const requests = await prisma.medicalAccessRequest.findMany({
-    where: {
-      doctorId: user.id
-    },
+    where,
+    take: 50, skip: (page - 1) * 50,
     include: {
-      patient: true
+      patient: { select: { id: true, fullName: true, email: true } }
     },
     orderBy: {
       createdAt: 'desc'
@@ -108,18 +113,23 @@ export default async function RequestAccessPage() {
       <div className="bg-white border rounded-xl p-6">
 
         <h2 className="font-semibold mb-6">
-          Pacientes con acceso autorizado
+          Historial de solicitudes ({totalRequests})
         </h2>
 
+        <form method="GET" className="flex gap-3 mb-4">
+          <select name="status" defaultValue={status || ''} aria-label="Estado de la solicitud" className="border p-2 rounded">
+            <option value="">Todos los estados</option><option value="PENDING">Pendientes</option><option value="APPROVED">Autorizadas</option><option value="REJECTED">Rechazadas</option>
+          </select><button className="border p-2 rounded">Filtrar</button>
+        </form>
         {requests.length === 0 && (
           <p className="text-gray-500">
-            No hay pacientes con acceso autorizado.
+            No hay solicitudes para estos filtros en esta página.
           </p>
         )}
 
         <div className="space-y-4">
 
-          {requests.map((req: any) => (
+          {requests.map((req) => (
 
             <div
               key={req.id}
@@ -174,6 +184,10 @@ export default async function RequestAccessPage() {
 
       </div>
 
+      <nav className="flex gap-4" aria-label="Páginas de solicitudes">
+        {page > 1 && <Link href={`?page=${page - 1}&status=${status || ''}`}>Anteriores</Link>}
+        {page * 50 < totalRequests && <Link href={`?page=${page + 1}&status=${status || ''}`}>Siguientes</Link>}
+      </nav>
     </div>
   )
 }
