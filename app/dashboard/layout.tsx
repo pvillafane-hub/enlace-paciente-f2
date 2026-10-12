@@ -135,6 +135,8 @@ export default async function DashboardLayout({
                   Usuarios
                 </Link>
 
+                <Link href="/dashboard/admin/licenses">Licencias</Link>
+
                 <Link href="/dashboard/admin/logs">
                   Logs
                 </Link>
