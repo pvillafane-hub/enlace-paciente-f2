@@ -11,11 +11,11 @@ import { revalidatePath } from 'next/cache'
 async function approveRequest(formData: FormData) {
   'use server'
   const session = await getValidatedSession()
-  if (!session) redirect('/login')
+  if (!session) redirect('/?auth=required')
   const requestId = formData.get('requestId')
   if (typeof requestId !== 'string' || !requestId) throw new Error('Solicitud inválida')
   await decideAccess(session.userId, requestId, true)
-  revalidatePath('/dashboard/doctors/requests')
+  revalidatePath('/dashboard', 'layout')
 }
 
 // ==============================
@@ -25,11 +25,11 @@ async function approveRequest(formData: FormData) {
 async function rejectRequest(formData: FormData) {
   'use server'
   const session = await getValidatedSession()
-  if (!session) redirect('/login')
+  if (!session) redirect('/?auth=required')
   const requestId = formData.get('requestId')
   if (typeof requestId !== 'string' || !requestId) throw new Error('Solicitud inválida')
   await decideAccess(session.userId, requestId, false)
-  revalidatePath('/dashboard/doctors/requests')
+  revalidatePath('/dashboard', 'layout')
 }
 
 // ==============================
@@ -44,15 +44,18 @@ export default async function RequestsPage() {
     redirect('/?auth=required')
   }
 
+  const actor = await prisma.user.findFirst({ where: { id: session.userId, role: 'PATIENT', active: true }, select: { id: true } })
+  if (!actor) redirect('/dashboard')
   const userId = session.userId
 
   const requests = await prisma.medicalAccessRequest.findMany({
     where: {
       patientId: userId,
-      status: "PENDING"
+      status: "PENDING",
+      OR: [{ initiatedBy: 'DOCTOR' }, { initiatedBy: null }]
     },
     include: {
-      doctor: true
+      doctor: { select: { fullName: true, email: true } }
     },
     orderBy: {
       createdAt: 'desc'
@@ -108,6 +111,7 @@ export default async function RequestsPage() {
                 </p>
               </div>
 
+              {req.initiatedBy === null && <p>Solicitud anterior: el origen no fue registrado. Aprobar concede acceso a este doctor.</p>}
               {/* BOTONES */}
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
 

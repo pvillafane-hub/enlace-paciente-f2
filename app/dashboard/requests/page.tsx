@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { RequestStatus } from '@prisma/client'
 import { sendRequest } from './actions'
+import { decideDoctorInvitation } from '@/lib/consent'
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -13,6 +15,21 @@ import QRScannerClient from './QRScannerClient'
 async function requestAccess(formData: FormData) {
   'use server'
   await sendRequest(String(formData.get('email') || ''))
+}
+
+async function acceptInvitation(formData: FormData) {
+  'use server'
+  const session = await getValidatedSession()
+  if (!session) redirect('/?auth=required')
+  await decideDoctorInvitation(session.userId, String(formData.get('requestId') || ''), true)
+  revalidatePath('/dashboard', 'layout')
+}
+async function rejectInvitation(formData: FormData) {
+  'use server'
+  const session = await getValidatedSession()
+  if (!session) redirect('/?auth=required')
+  await decideDoctorInvitation(session.userId, String(formData.get('requestId') || ''), false)
+  revalidatePath('/dashboard', 'layout')
 }
 
 // ==============================
@@ -31,10 +48,10 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: session.userId }
+    where: { id: session.userId }, select: { id: true, role: true, active: true }
   })
 
-  if (!user || user.role !== 'DOCTOR') {
+  if (!user?.active || user.role !== 'DOCTOR') {
     redirect('/dashboard')
   }
 
@@ -158,7 +175,7 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
 
                 {req.status === "PENDING" && (
                   <span className="bg-yellow-100 text-yellow-700 px-3 py-2 rounded-lg inline-block">
-                    Solicitud enviada
+                    {req.initiatedBy === 'PATIENT' ? 'Invitación recibida · Pendiente de tu aceptación' : req.initiatedBy === 'DOCTOR' ? 'Pendiente de aprobación del paciente' : 'Solicitud anterior · Origen no registrado'}
                   </span>
                 )}
 
@@ -174,6 +191,11 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
                   </span>
                 )}
 
+                {req.status === 'PENDING' && req.initiatedBy === 'PATIENT' && <div className="flex flex-wrap gap-3 mt-3">
+                  <form action={acceptInvitation}><input type="hidden" name="requestId" value={req.id} /><button className="bg-green-700 text-white px-4 py-3 rounded">Aceptar invitación</button></form>
+                  <form action={rejectInvitation}><input type="hidden" name="requestId" value={req.id} /><button className="bg-red-100 text-red-800 px-4 py-3 rounded">Rechazar</button></form>
+                </div>}
+                {req.status === 'PENDING' && req.initiatedBy === null && <p className="mt-2 font-normal">El paciente debe confirmar o reenviar su invitación.</p>}
               </div>
 
             </div>

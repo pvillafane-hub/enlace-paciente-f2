@@ -166,6 +166,7 @@ model MedicalAccessRequest {
   doctorId  String
   patientId String
   status    RequestStatus @default(PENDING)
+  initiatedBy Role?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

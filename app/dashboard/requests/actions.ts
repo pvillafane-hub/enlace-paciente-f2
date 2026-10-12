@@ -10,5 +10,5 @@ export async function sendRequest(email: string) {
   const patient = await prisma.user.findFirst({ where: { email: email.trim().toLowerCase(), role: 'PATIENT', active: true }, select: { id: true } })
   if (!patient) throw new Error('Paciente no disponible')
   await requestPatientAccess(session.userId, patient.id)
-  revalidatePath('/dashboard/requests')
+  revalidatePath('/dashboard', 'layout')
 }

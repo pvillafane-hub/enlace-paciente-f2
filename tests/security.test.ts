@@ -7,7 +7,7 @@ import { isSessionUsable } from '../src/lib/session-policy'
 
 const db = vi.hoisted(() => ({
   user: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-  medicalAccessRequest: { findFirst: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
+  medicalAccessRequest: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
   doctorPatient: { findUnique: vi.fn(), upsert: vi.fn() },
   clinicStaff: { findFirst: vi.fn() },
   passwordResetToken: { findFirst: vi.fn(), updateMany: vi.fn() },
@@ -18,7 +18,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 vi.mock('@/lib/rate-limit', () => ({ allowAttempt: vi.fn().mockResolvedValue(true) }))
 vi.mock('bcrypt', () => ({ default: { hash: vi.fn().mockResolvedValue('bcrypt-hash'), compare: vi.fn().mockResolvedValue(true) } }))
-import { decideAccess, requestPatientAccess } from '../src/lib/consent'
+import { decideAccess, requestPatientAccess, inviteDoctorAccess, decideDoctorInvitation } from '../src/lib/consent'
 import { canReadPatient } from '../src/lib/access'
 import resetHandler from '../pages/api/auth/reset-password'
 
@@ -161,5 +161,65 @@ describe('password reset consumption', () => {
     expect(db.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: { passwordHash: 'new-bcrypt-hash', passwordChangedAt: expect.any(Date) } }))
     expect(db.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'p' } })
     expect(db.auditLog.create).toHaveBeenCalledOnce()
+  })
+})
+
+
+describe('patient invitations and recipient boundaries', () => {
+  beforeEach(() => {
+    db.user.findFirst.mockResolvedValue({ id: 'active-actor' })
+    db.medicalAccessRequest.upsert.mockResolvedValue({ id: 'r' })
+  })
+  it('patient invitation records consent but never creates immediate access', async () => {
+    await inviteDoctorAccess('p', 'd')
+    expect(db.medicalAccessRequest.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: { patientId: 'p', doctorId: 'd', status: 'PENDING', initiatedBy: 'PATIENT' } }))
+    expect(db.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: 'p', action: 'DOCTOR_INVITED', entityId: 'r' }) }))
+    expect(db.doctorPatient.upsert).not.toHaveBeenCalled()
+  })
+  it('only the invited doctor can consume a patient-origin invitation', async () => {
+    db.medicalAccessRequest.findFirst.mockResolvedValue({ id: 'r', patientId: 'p', updatedAt: new Date() })
+    db.medicalAccessRequest.updateMany.mockResolvedValue({ count: 1 })
+    await decideDoctorInvitation('d', 'r', true)
+    expect(db.medicalAccessRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ doctorId: 'd', initiatedBy: 'PATIENT', status: 'PENDING', patient: { role: 'PATIENT', active: true } }) }))
+    expect(db.doctorPatient.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: { doctorId: 'd', patientId: 'p' } }))
+  })
+  it('doctor rejection creates no access', async () => {
+    db.medicalAccessRequest.findFirst.mockResolvedValue({ id: 'r', patientId: 'p' })
+    db.medicalAccessRequest.updateMany.mockResolvedValue({ count: 1 })
+    await decideDoctorInvitation('d', 'r', false)
+    expect(db.doctorPatient.upsert).not.toHaveBeenCalled()
+  })
+  it('own doctor request, unrelated invitation and unknown legacy origin cannot be accepted by doctor', async () => {
+    db.medicalAccessRequest.findFirst.mockResolvedValue(null)
+    await expect(decideDoctorInvitation('d', 'r', true)).rejects.toThrow()
+    expect(db.doctorPatient.upsert).not.toHaveBeenCalled()
+    expect(db.medicalAccessRequest.updateMany).not.toHaveBeenCalled()
+  })
+  it('replayed invitation cannot create access', async () => {
+    db.medicalAccessRequest.findFirst.mockResolvedValue({ id: 'r', patientId: 'p' })
+    db.medicalAccessRequest.updateMany.mockResolvedValue({ count: 0 })
+    await expect(decideDoctorInvitation('d', 'r', true)).rejects.toThrow()
+    expect(db.doctorPatient.upsert).not.toHaveBeenCalled()
+  })
+  it('doctor requesting again preserves pending patient consent and recipient', async () => {
+    db.medicalAccessRequest.findUnique.mockResolvedValue({ status: 'PENDING', initiatedBy: 'PATIENT' })
+    await requestPatientAccess('d', 'p')
+    expect(db.medicalAccessRequest.upsert).not.toHaveBeenCalled()
+  })
+  it('patient explicitly renewing an old or rejected request establishes a new invitation', async () => {
+    db.medicalAccessRequest.findUnique.mockResolvedValue({ status: 'REJECTED', initiatedBy: null })
+    await inviteDoctorAccess('p', 'd')
+    expect(db.medicalAccessRequest.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { status: 'PENDING', initiatedBy: 'PATIENT' } }))
+  })
+  it('patient decision excludes patient-origin invitations', async () => {
+    db.medicalAccessRequest.findFirst.mockResolvedValue(null)
+    await expect(decideAccess('p', 'r', true)).rejects.toThrow()
+    expect(db.medicalAccessRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ OR: [{ initiatedBy: 'DOCTOR' }, { initiatedBy: null }] }) }))
+    expect(db.doctorPatient.upsert).not.toHaveBeenCalled()
+  })
+  it('disabled doctor cannot accept an invitation', async () => {
+    db.user.findFirst.mockResolvedValue(null)
+    await expect(decideDoctorInvitation('d', 'r', true)).rejects.toThrow()
+    expect(db.medicalAccessRequest.findFirst).not.toHaveBeenCalled()
   })
 })
