@@ -190,7 +190,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     return (
       <div className="space-y-10">
 
-        {checkout && checkoutMessage[checkout] && <p role="status" className="bg-blue-50 border border-blue-200 text-blue-900 p-4 rounded-lg">{checkoutMessage[checkout]}</p>}
+        {checkout && typeof checkoutMessage[checkout] === "string" && <p role="status" className="bg-blue-50 border border-blue-200 text-blue-900 p-4 rounded-lg">{checkoutMessage[checkout]}</p>}
         {licenseInactive && (
           <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 rounded-lg flex justify-between items-center">
             <span>
