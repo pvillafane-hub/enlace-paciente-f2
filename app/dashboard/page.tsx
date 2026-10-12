@@ -8,7 +8,16 @@ import ActivatePatientBox from "@/components/staff/ActivatePatientBox"
 
 export const dynamic = "force-dynamic"
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+  const { checkout } = await searchParams
+  const checkoutMessage: Record<string, string> = {
+    unavailable: 'Los pagos aún no están configurados en esta versión. Contacta al administrador para activar este servicio.',
+    failed: 'No fue posible abrir la página de pago. Intenta nuevamente o contacta al administrador.',
+    'rate-limited': 'Has realizado varios intentos de pago. Espera unos minutos antes de intentar de nuevo.',
+    method: 'Para activar tu licencia, utiliza el botón de activación del dashboard.',
+    cancel: 'El proceso de pago fue cancelado. Puedes iniciarlo nuevamente cuando lo desees.',
+  }
+  const paymentsReady = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET)
 
   const session = await getValidatedSession()
 
@@ -181,16 +190,18 @@ export default async function Dashboard() {
     return (
       <div className="space-y-10">
 
+        {checkout && checkoutMessage[checkout] && <p role="status" className="bg-blue-50 border border-blue-200 text-blue-900 p-4 rounded-lg">{checkoutMessage[checkout]}</p>}
         {licenseInactive && (
           <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 rounded-lg flex justify-between items-center">
             <span>
-              ⚠️ Tu licencia está inactiva. Actívala para acceder a tus pacientes.
+              ⚠️ Tu licencia está inactiva. {paymentsReady ? "Puedes activarla mediante pago." : "La activación de pagos está pendiente de configuración por el administrador."}
             </span>
             <form method="post" action="/api/stripe/checkout"><button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
+              disabled={!paymentsReady}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Activar licencia
+              {paymentsReady ? "Activar licencia" : "Pagos no disponibles"}
             </button></form>
           </div>
         )}
