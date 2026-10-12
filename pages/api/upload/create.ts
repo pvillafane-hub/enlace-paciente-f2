@@ -3,7 +3,7 @@ import formidable, { type Fields, type Files } from 'formidable'
 import { readFile, unlink } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { putDocument, removeDocument } from '@/lib/document-storage'
+import { documentStorageKey, putDocument, removeDocument } from '@/lib/document-storage'
 import { getApiSession } from '@/lib/api-auth'
 import { canReadPatient } from '@/lib/access'
 import { MAX_UPLOAD_BYTES, detectDocumentType, validDateOnly } from '@/lib/file-policy'
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const bytes = await readFile(file.filepath)
     const contentType = detectDocumentType(bytes)
     if (!contentType || bytes.length > MAX_UPLOAD_BYTES) return res.status(400).json({ error: 'Solo PDF, JPEG, PNG y WebP' })
-    const key = `documents/${randomUUID()}`
+    const key = documentStorageKey(randomUUID())
     const filename = (file.originalFilename || 'documento').replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 180)
     await putDocument(key, bytes, contentType)
     try {
