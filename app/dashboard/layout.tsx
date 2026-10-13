@@ -1,3 +1,5 @@
+import { doctorAlertSummary } from '@/lib/doctor-alert-summary'
+import type { AlertSummary } from '@/lib/alert-summary'
 import { getLicenseAccess } from '@/lib/license-access'
 import NotificationBell from "@/components/NotificationBell"
 import MobileMenu from "@/components/MobileMenu"
@@ -38,36 +40,10 @@ export default async function DashboardLayout({
   const isDoctor = user.role === Role.DOCTOR
   const isAdmin = user.role === Role.ADMIN
 
-  // 🔔 ALERTAS (solo doctor)
-  let alerts: {
-    id: string
-    type: string
-    patientName: string
-    patientId: string
-  }[] = []
-
+  let alertSummary: AlertSummary = { alerts: [], total: 0, status: entitlement.active ? 'ready' : 'license-required' }
   if (isDoctor && entitlement.active) {
-    const alertsData = await prisma.medicalAlert.findMany({
-      where: {
-        doctorId: user.id,
-        resolved: false,
-        patient: { active: true, role: "PATIENT", patientDoctors: { some: { doctorId: user.id } } }
-      },
-      include: {
-        patient: { select: { id: true, fullName: true } }
-      },
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 5
-    })
-
-    alerts = alertsData.map(a => ({
-      id: a.id,
-      type: a.type,
-      patientName: a.patient.fullName,
-      patientId: a.patient.id
-    }))
+    try { alertSummary = await doctorAlertSummary(user.id) }
+    catch { alertSummary = { alerts: [], total: 0, status: 'error' } }
   }
 
   return (
@@ -149,7 +125,7 @@ export default async function DashboardLayout({
               </>
             )}
 
-            {isDoctor && <NotificationBell alerts={alerts} />}
+            {isDoctor && <NotificationBell summary={alertSummary} variant="desktop" />}
 
             <form action={logout}>
               <button className="text-red-600">
@@ -164,7 +140,7 @@ export default async function DashboardLayout({
             isDoctor={isDoctor}
             isStaff={user.role === Role.STAFF}
             isAdmin={isAdmin}
-            alerts={alerts}
+            alertSummary={alertSummary}
             NotificationBell={NotificationBell}
             logout={logout}
           />

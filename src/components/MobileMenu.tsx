@@ -7,7 +7,7 @@ export default function MobileMenu({
   isDoctor,
   isAdmin,
   isStaff = false,
-  alerts,
+  alertSummary,
   NotificationBell,
   logout,
 }: any) {
@@ -95,7 +95,7 @@ export default function MobileMenu({
               </>
             )}
 
-            {isDoctor && <NotificationBell alerts={alerts} />}
+            {isDoctor && <NotificationBell summary={alertSummary} variant="mobile" />}
 
             <form action={logout}>
               <button className="text-red-600">Salir</button>

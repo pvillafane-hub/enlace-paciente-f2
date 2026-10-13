@@ -1,67 +1,21 @@
 import { getLicenseAccess } from '@/lib/license-access'
 import { clinicDoctorId } from '@/lib/access'
-import { prisma } from "@/lib/prisma"
-import { getValidatedSession } from "@/lib/auth"
-import { NextResponse } from "next/server"
-
+import { doctorAlertSummary } from '@/lib/doctor-alert-summary'
+import { prisma } from '@/lib/prisma'
+import { getValidatedSession } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET() {
   try {
     const session = await getValidatedSession()
-
-    if (!session) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      )
-    }
-
-    if (!session.userId) {
-      return NextResponse.json(
-        { error: "Sesión inválida" },
-        { status: 401 }
-      )
-    }
-
+    if (!session?.userId) return NextResponse.json({ error: 'Sesión finalizada' }, { status: 401, headers })
     const actor = await prisma.user.findUnique({ where: { id: session.userId } })
-    const userId = actor ? await clinicDoctorId(actor) : null
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-
-    if (!(await getLicenseAccess(session.userId)).active) return NextResponse.json([])
-    const alerts = await prisma.medicalAlert.findMany({
-      where: {
-        doctorId: userId,
-        resolved: false,
-        patient: { active: true, patientDoctors: { some: { doctorId: userId } } }
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            fullName: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 5
-    })
-
-    return NextResponse.json(
-      alerts.map(a => ({
-        id: a.id,
-        type: a.type,
-        patientName: a.patient?.fullName || "Paciente",
-        patientId: a.patient?.id || a.patientId
-      }))
-    )
-
-  } catch (error) {
-    console.error("ALERTS ERROR:", error)
-
-    return NextResponse.json(
-      { error: "Error interno del servidor" },
-      { status: 500 }
-    )
+    const doctorId = actor ? await clinicDoctorId(actor) : null
+    if (!doctorId) return NextResponse.json({ error: 'Acceso no disponible' }, { status: 403, headers })
+    if (!(await getLicenseAccess(session.userId)).active) return NextResponse.json({ status: 'license-required', alerts: [], total: 0 }, { headers })
+    return NextResponse.json(await doctorAlertSummary(doctorId), { headers })
+  } catch {
+    console.error('ALERT_SUMMARY_FAILED')
+    return NextResponse.json({ error: 'No se pudieron actualizar las alertas' }, { status: 503, headers })
   }
 }
