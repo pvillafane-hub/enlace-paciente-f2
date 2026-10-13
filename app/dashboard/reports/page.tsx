@@ -1,267 +1,96 @@
 import { getLicenseAccess } from '@/lib/license-access'
-import { prisma } from "@/lib/prisma"
-import { getValidatedSession } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import ActivitySearch from "./ActivitySearch"
-import { reportActivity, inactivityLabel } from "@/lib/report-view"
+import { prisma } from '@/lib/prisma'
+import { getValidatedSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import type { Prisma } from '@prisma/client'
+import ActivitySearch from './ActivitySearch'
+import { reportFilters, reportHref, reportDocument, type ReportParams } from '@/lib/report-filters'
+export const dynamic = 'force-dynamic'
+const PAGE_SIZE = 20
 
-export const dynamic = "force-dynamic"
-
-export default async function ReportsPage() {
-
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportParams> }) {
   const session = await getValidatedSession()
-
-  if (!session?.userId) {
-    redirect("/?auth=required")
-  }
-
-  const doctor = await prisma.user.findUnique({
-    where: { id: session.userId }
-  })
-
-  if (!doctor || doctor.role !== "DOCTOR") {
-    redirect("/dashboard")
-  }
-
+  if (!session?.userId) redirect('/?auth=required')
+  const doctor = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, role: true, active: true } })
+  if (!doctor?.active || doctor.role !== 'DOCTOR') redirect('/dashboard')
   const entitlement = await getLicenseAccess(doctor.id)
-
+  const params = await searchParams
+  let error = ''
+  let filters = reportFilters({})
+  try { filters = reportFilters(params) } catch (e) { error = e instanceof Error ? e.message : 'Verifica los filtros.' }
   const patients = await prisma.doctorPatient.findMany({
-    where: {
-      doctorId: doctor.id,
-      patient: { active: true, role: "PATIENT" }
-    },
-    select: {
-      patientId: true,
-      patient: { select: { id: true, fullName: true } }
-    }
+    where: { doctorId: doctor.id, patient: { active: true, role: 'PATIENT' } },
+    select: { patientId: true, patient: { select: { id: true, fullName: true } } }, orderBy: [{ patient: { fullName: 'asc' } }, { patientId: 'asc' }],
   })
-
-  const patientIds = patients.map(p => p.patientId)
-
-  const documents = await prisma.document.findMany({
-    where: {
-      deletedAt: null, ...entitlement.documentWhere,
-      userId: {
-        in: patientIds
-      }
-    },
-    select: {
-      id: true, docType: true, specialty: true, bodyPart: true, createdAt: true,
-      user: { select: { fullName: true } }
-    },
-    orderBy: {
-      createdAt: "desc"
-    },
-    take: 20
-  })
-
-  const totalDocuments = await prisma.document.count({ where: { deletedAt: null, ...entitlement.documentWhere, userId: { in: patientIds } } })
-
-  const documentsByType = await prisma.document.groupBy({
-    by: ["docType"],
-    where: {
-      deletedAt: null, ...entitlement.documentWhere,
-      userId: {
-        in: patientIds
-      }
-    },
-    _count: true
-  })
-
-  const pendingRequests = await prisma.medicalAccessRequest.count({
-    where: {
-      doctorId: doctor.id,
-      status: "PENDING"
-    }
-  })
-
-  // 🔥 ACTIVIDAD POR PACIENTE
-  const activity = await prisma.document.groupBy({
-    by: ["userId"],
-    where: {
-      deletedAt: null, ...entitlement.documentWhere,
-      userId: { in: patientIds }
-    },
-    _max: {
-      createdAt: true
-    }
-  })
-
-  const lastActivityMap = new Map(
-    activity.map(a => [a.userId, a._max.createdAt])
-  )
-
-  const now = Date.now()
-
-  const inactivePatients = patients.map(p => {
-
-    const last = lastActivityMap.get(p.patient.id)
-
-    let daysInactive: number | null = null
-
-    if (last) {
-      daysInactive = Math.floor(
-        (now - new Date(last).getTime()) / (1000 * 60 * 60 * 24)
-      )
-    }
-
-    return {
-      id: p.patient.id,
-      name: p.patient.fullName,
-      daysInactive
-    }
-
-  })
-  .filter(p => p.daysInactive === null || p.daysInactive >= 30)
-  .sort((a, b) => (b.daysInactive ?? Infinity) - (a.daysInactive ?? Infinity))
-
-  return (
-
-    <div className="max-w-6xl mx-auto space-y-10">
-
-      {/* HEADER */}
-      <div className="bg-white border rounded-xl p-6">
-        <h1 className="text-3xl font-bold">
-          Reportes clínicos
-        </h1>
-
-        <p className="text-gray-500 mt-2">
-          Seguimiento documental de pacientes y actividad reciente
-        </p>
-
-        <p className="text-sm text-gray-400 mt-1">
-          Identifica pacientes sin actividad y revisa la información clínica más reciente.
-        </p>
+  const ids = patients.map(p => p.patientId)
+  if (filters.patient && !ids.includes(filters.patient)) error = 'Selecciona un paciente autorizado de tu lista.'
+  const baseWhere: Prisma.DocumentWhereInput = { deletedAt: null, ...entitlement.documentWhere, userId: { in: ids } }
+  const pendingWhere: Prisma.MedicalAccessRequestWhereInput = { doctorId: doctor.id, status: 'PENDING', patient: { active: true, role: 'PATIENT' }, ...(entitlement.cutoff ? { createdAt: { lt: entitlement.cutoff } } : {}) }
+  const [totalDocuments, types, toAccept, waitingPatient, activity] = await Promise.all([
+    prisma.document.count({ where: baseWhere }),
+    prisma.document.groupBy({ by: ['docType'], where: baseWhere, _count: true, orderBy: { docType: 'asc' } }),
+    prisma.medicalAccessRequest.count({ where: { ...pendingWhere, initiatedBy: 'PATIENT' } }),
+    prisma.medicalAccessRequest.count({ where: { ...pendingWhere, OR: [{ initiatedBy: 'DOCTOR' }, { initiatedBy: null }] } }),
+    prisma.document.groupBy({ by: ['userId'], where: baseWhere, _max: { createdAt: true } }),
+  ])
+  const where: Prisma.DocumentWhereInput = error ? { id: { in: [] }, ...baseWhere } : {
+    AND: [baseWhere, {
+      ...(filters.patient ? { userId: filters.patient } : {}), ...(filters.type ? { docType: filters.type } : {}),
+      ...(filters.from || filters.to ? { createdAt: { ...(filters.from ? { gte: filters.from } : {}), ...(filters.to ? { lt: filters.to } : {}) } } : {}),
+      ...(filters.q ? { OR: [{ filename: { contains: filters.q, mode: 'insensitive' } }, { docType: { contains: filters.q, mode: 'insensitive' } }, { facility: { contains: filters.q, mode: 'insensitive' } }, { user: { fullName: { contains: filters.q, mode: 'insensitive' } } }] } : {}),
+    }],
+  }
+  const matches = await prisma.document.count({ where })
+  const pages = Math.max(1, Math.ceil(matches / PAGE_SIZE)), page = Math.min(filters.page, pages)
+  const documents = await prisma.document.findMany({ where, select: { id: true, userId: true, filename: true, docType: true, facility: true, studyDate: true, createdAt: true, user: { select: { fullName: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE })
+  const lastByPatient = new Map(activity.map(a => [a.userId, a._max.createdAt]))
+  const noRecent = patients.map(p => ({ ...p, last: lastByPatient.get(p.patientId) ?? null })).filter(p => !p.last || (entitlement.active && Date.now() - p.last.getTime() >= 30 * 86400000)).sort((a,b) => (a.last?.getTime() ?? 0) - (b.last?.getTime() ?? 0) || a.patientId.localeCompare(b.patientId))
+  const activityPages = Math.max(1, Math.ceil(noRecent.length / PAGE_SIZE)), activityPage = Math.min(filters.activityPage, activityPages)
+  return <div className="space-y-8">
+    <header className="rounded-xl border bg-white p-4 sm:p-6">
+      <h1 className="text-2xl sm:text-3xl font-bold">Reportes de pacientes y documentos</h1>
+      <p className="mt-2 text-gray-700">Consulta tus pacientes autorizados, encuentra documentos y revisa las solicitudes pendientes.</p>
+    </header>
+    {!entitlement.active && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">Este reporte es histórico y parcial. Solo muestra documentos anteriores al vencimiento de tu licencia. Puede haber cargas posteriores no visibles; las cifras no indican la actividad actual. Los archivos no se pueden abrir sin licencia activa.</p>}
+    <section aria-label="Resumen general" className="space-y-3">
+      <p className="text-gray-700">Resumen de todos tus pacientes autorizados. Los filtros de abajo se aplican al listado de documentos.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Stat label="Pacientes autorizados" value={patients.length} />
+        <Stat label={entitlement.active ? 'Documentos registrados' : 'Documentos históricos visibles'} value={totalDocuments} />
+        <Stat label="Invitaciones por aceptar" value={toAccept} href="/dashboard/requests?status=PENDING" />
+        <Stat label="Esperando al paciente" value={waitingPatient} href="/dashboard/requests?status=PENDING" />
       </div>
-
-      {/* Estadísticas */}
-      <div className="grid md:grid-cols-4 gap-6">
-
-        <StatCard title="Pacientes activos" value={patients.length} />
-        <StatCard title="Estudios registrados" value={totalDocuments} />
-        <StatCard title="Accesos pendientes" value={pendingRequests} />
-        <StatCard title="Sin documentos registrados" value={inactivePatients.filter(p => p.daysInactive === null).length} />
-
-      </div>
-
-      {/* 🔴 INACTIVOS */}
-      <div className="bg-white border rounded-xl p-6">
-
-        <h2 className="text-xl font-semibold mb-1">
-          Pacientes que requieren seguimiento
-        </h2>
-
-        <p className="text-sm text-gray-500 mb-6">
-          Pacientes sin cargas de documentos recientes
-        </p>
-
-        {inactivePatients.length === 0 && (
-          <p className="text-gray-500">
-            Todos los pacientes presentan actividad reciente.
-          </p>
-        )}
-
-        <div className="space-y-4">
-
-          {inactivePatients.map(p => {
-
-            const label = inactivityLabel(p.daysInactive)
-
-            return (
-
-              <div
-                key={p.id}
-                className="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"
-              >
-
-                <div>
-                  <p className="font-semibold">{p.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {label}
-                  </p>
-                </div>
-
-                <a
-                  href={`/dashboard/patients/${p.id}`}
-                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                >
-                  Abrir expediente
-                </a>
-
-              </div>
-
-            )
-          })}
-
-        </div>
-
-      </div>
-
-      {/* 🔍 Actividad reciente CON SEARCH */}
-      <div className="bg-white border rounded-xl p-6">
-
-        <h2 className="text-xl font-semibold mb-6">
-          Últimos 20 documentos cargados
-        </h2>
-
-        {documents.length === 0 ? (
-          <p className="text-gray-500">
-            No hay documentos registrados.
-          </p>
-        ) : (
-          <ActivitySearch documents={documents.map(reportActivity)} />
-        )}
-
-      </div>
-
-      {/* Estudios por tipo */}
-      <div className="bg-white border rounded-xl p-6">
-
-        <h2 className="text-xl font-semibold mb-6">
-          Estudios por tipo
-        </h2>
-
-        <div className="grid md:grid-cols-3 gap-6">
-
-          {documentsByType.map(item => (
-
-            <div
-              key={item.docType}
-              className="bg-gray-50 border rounded-lg p-6 text-center"
-            >
-
-              <p className="text-gray-500 text-sm">
-                {item.docType}
-              </p>
-
-              <p className="text-3xl font-bold mt-2">
-                {item._count}
-              </p>
-
-            </div>
-
-          ))}
-
-        </div>
-
-      </div>
-
-    </div>
-
-  )
+    </section>
+    <section aria-labelledby="document-title" className="rounded-xl border bg-white p-4 sm:p-6 space-y-5">
+      <h2 id="document-title" className="text-xl font-semibold">Buscar documentos</h2>
+      <form method="GET" className="grid sm:grid-cols-2 gap-4">
+        <label className="block sm:col-span-2 font-medium">Buscar por paciente, documento o institución<input type="search" name="q" defaultValue={filters.q} maxLength={100} className="mt-2 block w-full rounded-xl border p-3 text-lg" /></label>
+        <label className="block font-medium">Paciente<select name="patient" defaultValue={filters.patient} className="mt-2 block w-full rounded-xl border p-3 text-lg"><option value="">Todos mis pacientes</option>{patients.map(p => <option key={p.patientId} value={p.patientId}>{p.patient.fullName}</option>)}</select></label>
+        <label className="block font-medium">Tipo de documento<select name="type" defaultValue={filters.type} className="mt-2 block w-full rounded-xl border p-3 text-lg"><option value="">Todos los tipos</option>{types.map(t => <option key={t.docType} value={t.docType}>{t.docType}</option>)}</select></label>
+        <label className="block font-medium">Cargado desde<input type="date" name="from" defaultValue={params.from || ''} className="mt-2 block w-full rounded-xl border p-3 text-lg" /></label>
+        <label className="block font-medium">Cargado hasta<input type="date" name="to" defaultValue={params.to || ''} className="mt-2 block w-full rounded-xl border p-3 text-lg" /></label>
+        <div className="sm:col-span-2 flex flex-wrap items-center gap-4"><button className="min-h-12 rounded-xl bg-blue-700 px-5 py-3 text-lg font-semibold text-white">Buscar</button><Link href="/dashboard/reports" className="inline-flex min-h-12 items-center underline">Limpiar filtros</Link></div>
+      </form>
+      <p className="text-gray-700">Las fechas filtran por carga, no por fecha del estudio. «Hasta» incluye todo ese día en Puerto Rico.</p>
+      {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
+      <p role="status" className="font-medium">{matches} documentos encontrados</p>
+      {documents.length ? <ActivitySearch documents={documents.map(reportDocument)} /> : <p>{!patients.length ? 'Todavía no tienes pacientes autorizados. Revisa tus invitaciones en Solicitudes.' : error ? 'Corrige los filtros para buscar.' : 'No hay documentos visibles que coincidan con estos filtros.'}</p>}
+      <Pagination params={params} page={page} pages={pages} field="page" label="Páginas de documentos" />
+    </section>
+    <section className="rounded-xl border bg-white p-4 sm:p-6 space-y-4">
+      <h2 className="text-xl font-semibold">{entitlement.active ? 'Pacientes sin cargas recientes' : 'Pacientes sin documentos visibles'}</h2>
+      <p className="text-gray-700">{entitlement.active ? 'Sin documentos o sin nuevas cargas en 30 días. Este dato describe actividad documental, no una evaluación médica.' : 'La ausencia de documentos en este historial no confirma que no existan documentos nuevos.'}</p>
+      {!noRecent.length && <p>{!patients.length ? 'Todavía no tienes pacientes autorizados.' : entitlement.active ? 'Tus pacientes autorizados tienen cargas en los últimos 30 días.' : 'Todos tus pacientes autorizados tienen documentos en el historial visible.'}</p>}
+      {noRecent.slice((activityPage - 1) * PAGE_SIZE, activityPage * PAGE_SIZE).map(p => <div key={p.patientId} className="rounded-xl border p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"><div className="min-w-0 break-words"><p className="text-lg font-semibold">{p.patient.fullName}</p><p className="text-gray-700">{p.last ? `Última carga visible: ${p.last.toLocaleDateString('es-PR', { timeZone: 'America/Puerto_Rico' })}` : 'Sin documentos visibles'}</p></div><Link href={`/dashboard/patients/${p.patientId}`} className="inline-flex min-h-12 items-center rounded-xl border px-4 py-3 shrink-0">Ir al expediente</Link></div>)}
+      <Pagination params={params} page={activityPage} pages={activityPages} field="activityPage" label="Páginas de pacientes sin cargas" />
+    </section>
+  </div>
 }
-
-function StatCard({
-  title,
-  value
-}: {
-  title: string
-  value: number | string
-}) {
-  return (
-    <div className="bg-white rounded-xl p-6 border shadow-sm">
-      <p className="text-gray-500 text-sm">{title}</p>
-      <p className="text-3xl font-bold mt-2">{value}</p>
-    </div>
-  )
+function Stat({ label, value, href }: { label: string; value: number; href?: string }) {
+  return <div className="rounded-xl border bg-white p-5"><p className="text-gray-700">{label}</p><p className="mt-2 text-3xl font-bold">{value}</p>{href && <Link href={href} className="inline-flex min-h-12 items-center text-blue-800 underline">Revisar solicitudes</Link>}</div>
+}
+function Pagination({ params, page, pages, field, label }: { params: ReportParams; page: number; pages: number; field: 'page' | 'activityPage'; label: string }) {
+  if (pages < 2) return null
+  return <nav aria-label={label} className="flex flex-wrap items-center gap-4">{page > 1 && <Link href={reportHref(params, { [field]: String(page - 1) })} className="inline-flex min-h-12 items-center underline">Anteriores</Link>}<span>Página {page} de {pages}</span>{page < pages && <Link href={reportHref(params, { [field]: String(page + 1) })} className="inline-flex min-h-12 items-center underline">Siguientes</Link>}</nav>
 }
