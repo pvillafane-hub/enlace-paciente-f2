@@ -1,53 +1,28 @@
 import { getLicenseAccess } from '@/lib/license-access'
-import { validDateOnly } from '@/lib/file-policy'
-import { prisma } from "@/lib/prisma"
-import { getValidatedSession } from "@/lib/auth"
-import { NextResponse } from "next/server"
+import { parsePatientProfile, ProfileInputError } from '@/lib/patient-profile-policy'
+import { prisma } from '@/lib/prisma'
+import { getValidatedSession } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
     const session = await getValidatedSession()
-
-    // 🔐 Validar sesión
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    // 🔥 FIX CRÍTICO (evita string | null)
-    if (!session.userId) {
-      return NextResponse.json(
-        { error: "Sesión inválida (sin usuario)" },
-        { status: 401 }
-      )
-    }
-
+    if (!session?.userId) return NextResponse.json({ error: 'Tu sesión terminó. Vuelve a iniciar sesión para guardar.' }, { status: 401 })
     const userId = session.userId
-    if (!(await getLicenseAccess(userId)).active) return NextResponse.json({ error: 'Necesitas una licencia activa para modificar el expediente' }, { status: 403 })
-
-    const body = await req.json()
-    const { dateOfBirth, bloodType, allergies } = body
-
-    if ((dateOfBirth && (!validDateOnly(dateOfBirth) || new Date(dateOfBirth) > new Date())) ||
-        (bloodType && !['O+','O-','A+','A-','B+','B-','AB+','AB-'].includes(bloodType)) ||
-        (allergies && (typeof allergies !== 'string' || allergies.length > 2000))) return NextResponse.json({ error: 'Información inválida' }, { status: 400 })
     const actor = await prisma.user.findFirst({ where: { id: userId, role: 'PATIENT', active: true }, select: { id: true } })
-    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    if (!actor) return NextResponse.json({ error: 'Solo una cuenta de paciente activa puede modificar su información.' }, { status: 403 })
+    if (!(await getLicenseAccess(userId)).active) return NextResponse.json({ error: 'Necesitas una licencia activa para modificar tu información. Los datos escritos se conservan en esta pantalla.' }, { status: 403 })
+    let body: unknown
+    try { body = await req.json() } catch { return NextResponse.json({ error: 'No se pudo leer el formulario. Intenta nuevamente.' }, { status: 400 }) }
+    const data = parsePatientProfile(body)
     await prisma.$transaction(async tx => {
-      await tx.user.update({ where: { id: userId }, data: { dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null, bloodType: bloodType || null, allergies: allergies || null } })
-      await tx.auditLog.create({ data: { userId, action: 'PATIENT_PROFILE_UPDATED' } })
+      await tx.user.update({ where: { id: userId }, data })
+      await tx.auditLog.create({ data: { userId, action: 'PATIENT_PROFILE_UPDATED', metadata: { fields: ['dateOfBirth', 'bloodType', 'allergies'], source: 'patient_self_reported' } } })
     })
-
     return NextResponse.json({ ok: true })
-
   } catch (error) {
-    console.error("UPDATE INFO ERROR:", error)
-
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    )
+    if (error instanceof ProfileInputError) return NextResponse.json({ error: error.message }, { status: 400 })
+    console.error('PATIENT_PROFILE_UPDATE_FAILED')
+    return NextResponse.json({ error: 'No se pudo guardar. Tu información escrita sigue en la pantalla; intenta nuevamente.' }, { status: 500 })
   }
 }

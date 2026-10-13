@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
@@ -16,13 +17,16 @@ export default async function ProfilePage() {
     where: { id: session.userId }
   })
 
-  if (!user) {
+  if (!user?.active || user.role !== 'PATIENT') {
     redirect("/dashboard")
   }
+
+  const entitlement = await getLicenseAccess(session.userId)
 
   return (
     <div className="max-w-2xl mx-auto mt-6">
       <PatientClinicalForm
+        canEdit={entitlement.active}
         initialData={{
           dateOfBirth: user.dateOfBirth?.toISOString().split("T")[0] || "",
           bloodType: user.bloodType || "",

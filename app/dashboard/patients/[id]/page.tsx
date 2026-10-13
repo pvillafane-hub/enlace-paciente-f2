@@ -1,3 +1,4 @@
+import { allergyState } from '@/lib/patient-profile-policy'
 import { getLicenseAccess } from '@/lib/license-access'
 import { canReadPatient } from '@/lib/access'
 import Link from 'next/link'
@@ -238,7 +239,7 @@ export default async function PatientPage({
             <p className="text-sm text-gray-500">Fecha de nacimiento</p>
             <p className="text-lg font-semibold">
               {!(entitlement.active || isDemo) ? 'Licencia requerida' : patient.dateOfBirth
-                ? new Date(patient.dateOfBirth).toLocaleDateString('es-PR')
+                ? new Date(patient.dateOfBirth).toLocaleDateString('es-PR', { timeZone: 'UTC' })
                 : "No registrada"}
             </p>
           </div>
@@ -249,7 +250,7 @@ export default async function PatientPage({
           </div>
 
           <div className={`p-4 rounded-xl ${
-            (entitlement.active || isDemo) && patient.allergies
+            (entitlement.active || isDemo) && allergyState(patient.allergies || '') === 'known'
               ? "bg-red-100 border-2 border-red-400"
               : "bg-gray-50 border border-gray-200"
           }`}>

@@ -328,7 +328,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   // =========================
 
   const needsProfile =
-    !userData.dateOfBirth ||
     !userData.bloodType ||
     !userData.allergies
 
