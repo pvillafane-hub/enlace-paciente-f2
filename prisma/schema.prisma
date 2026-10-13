@@ -36,6 +36,8 @@ model User {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  guardianLinks GuardianLink[] @relation("GuardianLinks")
+  representatives GuardianLink[] @relation("Representatives")
   qrTokens PatientQRToken[]  // 🔥 relación QR
 
   // 🔥 INFO MÉDICA
@@ -95,6 +97,7 @@ model Document {
   studyDate String
   createdAt DateTime  @default(now())
   deletedAt DateTime?
+  proxyVisible Boolean @default(false)
   bodyPart String?
   specialty String?
 
@@ -253,4 +256,25 @@ model SecurityRateLimit {
 model PaymentEvent {
   id String @id
   createdAt DateTime @default(now())
+}
+
+model GuardianLink {
+  id String @id @default(cuid())
+  guardianId String
+  patientId String
+  relationship String
+  status String @default("PENDING")
+  canUpload Boolean @default(false)
+  verification String?
+  requestedById String
+  reviewedById String?
+  reviewedAt DateTime?
+  validUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  guardian User @relation("GuardianLinks", fields: [guardianId], references: [id])
+  patient User @relation("Representatives", fields: [patientId], references: [id])
+  @@unique([guardianId, patientId])
+  @@index([guardianId, status, validUntil])
+  @@index([status, createdAt])
 }

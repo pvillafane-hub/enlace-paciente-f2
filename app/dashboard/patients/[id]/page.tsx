@@ -211,6 +211,7 @@ export default async function PatientPage({
 
       </div>
 
+      {!isDemo && <Link href={`/dashboard/patients/${patient.id}/representatives`} className="inline-flex min-h-12 items-center rounded-xl border px-4 py-3">Representantes del paciente</Link>}
       {/* SUBIR DOCUMENTO */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
         <h2 className="text-xl font-semibold mb-2">

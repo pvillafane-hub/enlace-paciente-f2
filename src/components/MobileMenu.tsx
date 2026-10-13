@@ -44,7 +44,7 @@ export default function MobileMenu({
       <button
         onClick={() => setOpen(true)}
         aria-label="Abrir menú" aria-expanded={open} aria-controls="mobile-navigation"
-        className="md:hidden min-h-12 min-w-12 text-2xl"
+        className="lg:hidden min-h-12 min-w-12 text-2xl"
       >
         ☰
       </button>
@@ -72,6 +72,7 @@ export default function MobileMenu({
 
             {!isDoctor && !isAdmin && !isStaff && (
               <>
+                <Link href="/dashboard/dependents" onClick={() => setOpen(false)}>Personas a mi cargo</Link>
                 <Link href="/dashboard/doctors" onClick={() => setOpen(false)}>Mis doctores</Link>
                 <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>
                 <Link href="/dashboard/qr" onClick={() => setOpen(false)}>Mostrar código</Link>
@@ -89,6 +90,7 @@ export default function MobileMenu({
             {isAdmin && (
               <>
                 <Link href="/dashboard/admin/users" onClick={() => setOpen(false)}>Usuarios</Link>
+                <Link href="/dashboard/admin/guardians" onClick={() => setOpen(false)}>Padres y tutores</Link>
                 <Link href="/dashboard/admin/licenses" onClick={() => setOpen(false)}>Licencias</Link>
                 <Link href="/dashboard/admin/logs" onClick={() => setOpen(false)}>Logs</Link>
                 <Link href="/dashboard/admin/alerts" onClick={() => setOpen(false)}>Alertas</Link>

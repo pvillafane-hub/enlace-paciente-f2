@@ -12,7 +12,7 @@ export default function NotificationBell({ summary: initialSummary, variant = 'd
   useEffect(() => {
     let disposed = false, busy = false
     let controller: AbortController | null = null
-    const media = window.matchMedia('(min-width: 768px)')
+    const media = window.matchMedia('(min-width: 1024px)')
     const visible = () => document.visibilityState === 'visible' && (variant === 'desktop' ? media.matches : !media.matches)
     async function refresh() {
       if (!visible() || busy) return

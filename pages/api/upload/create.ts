@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { documentStorageKey, putDocument, removeDocument } from '@/lib/document-storage'
 import { getApiSession } from '@/lib/api-auth'
-import { canReadPatient } from '@/lib/access'
+import { canUploadPatient, activeGuardian } from '@/lib/guardian-access'
 import { MAX_UPLOAD_BYTES, detectDocumentType, validDateOnly } from '@/lib/file-policy'
 
 export const config = { api: { bodyParser: false } }
@@ -26,7 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const [fields, files] = parsed
     const value = (key: string) => fields[key]?.[0]?.trim() ?? ''
     const patientId = value('patientId') || session.userId
-    if (!await canReadPatient(session.user, patientId)) return res.status(403).json({ error: 'Acceso denegado' })
+    if (!await canUploadPatient(session.user, patientId)) return res.status(403).json({ error: 'Acceso denegado' })
+    const guardian = await activeGuardian(session.user, patientId)
     const docType = value('docType'), facility = value('facility'), studyDate = value('studyDate')
     const bodyPart = value('bodyPart').toLowerCase(), specialty = value('specialty').toLowerCase()
     if (!docType || docType.length > 80 || !facility || facility.length > 200 || !validDateOnly(studyDate)) return res.status(400).json({ error: 'Verifique tipo, institución y fecha del estudio' })
@@ -39,11 +40,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!contentType || bytes.length > MAX_UPLOAD_BYTES) return res.status(400).json({ error: 'Solo PDF, JPEG, PNG y WebP' })
     const key = documentStorageKey(randomUUID())
     const filename = (file.originalFilename || 'documento').replace(/[\x00-\x1f\x7f/\\]/g, '_').slice(0, 180)
+    if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'La licencia dejó de estar activa. No se guardó el archivo.' })
     await putDocument(key, bytes, contentType)
     try {
       const document = await prisma.$transaction(async tx => {
-        const created = await tx.document.create({ data: { userId: patientId, docType, facility, studyDate, filename, filePath: key, bodyPart: bodyPart || null, specialty: specialty || null } })
-        await tx.auditLog.create({ data: { userId: session.userId, action: 'DOCUMENT_UPLOADED', entityId: created.id } })
+        if (guardian && !await tx.guardianLink.findFirst({ where: { id: guardian.id, guardianId: session.userId, patientId, status: 'ACTIVE', canUpload: true, validUntil: { gt: new Date() }, guardian: { active: true, role: 'PATIENT' }, patient: { active: true, role: 'PATIENT' } }, select: { id: true } })) throw new Error('Representative access no longer available')
+        const created = await tx.document.create({ data: { userId: patientId, docType, facility, studyDate, filename, filePath: key, bodyPart: bodyPart || null, specialty: specialty || null, proxyVisible: false } })
+        await tx.auditLog.create({ data: { userId: session.userId, action: 'DOCUMENT_UPLOADED', entityId: created.id, metadata: { patientId, actingAsRepresentative: Boolean(guardian) } } })
         return created
       })
       return res.status(200).json({ success: true, document, uploadedForUserId: patientId })

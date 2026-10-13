@@ -1,5 +1,5 @@
 import { getLicenseAccess } from '@/lib/license-access'
-import { canReadPatient } from '@/lib/access'
+import { canReadDocument } from '@/lib/guardian-access'
 import { auditLog } from '@/lib/audit'
 import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from "next"
@@ -65,7 +65,7 @@ export default async function handler(
       })
     }
 
-    if (!await canReadPatient(session.user, document.userId)) return res.status(403).json({ error: 'Acceso denegado' })
+    if (!await canReadDocument(session.user, document)) return res.status(403).json({ error: 'Acceso denegado' })
 
     const file = await readDocument(document.filePath)
     if (!file || file.statusCode !== 200) return res.status(404).json({ error: 'Documento no disponible' })
