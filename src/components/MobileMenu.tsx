@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 export default function MobileMenu({
   isDoctor,
   isAdmin,
+  isStaff = false,
   alerts,
   NotificationBell,
   logout,
@@ -13,15 +14,27 @@ export default function MobileMenu({
 
   const [open, setOpen] = useState(false);
 
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    function keydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Tab') return;
+      const controls = panelRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled])');
+      if (!controls?.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
-
+    document.addEventListener('keydown', keydown);
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', keydown);
+      previousFocus?.focus();
     };
   }, [open]);
 
@@ -30,7 +43,8 @@ export default function MobileMenu({
       {/* ☰ SOLO MOBILE */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden text-2xl"
+        aria-label="Abrir menú" aria-expanded={open} aria-controls="mobile-navigation"
+        className="md:hidden min-h-12 min-w-12 text-2xl"
       >
         ☰
       </button>
@@ -45,29 +59,30 @@ export default function MobileMenu({
           />
 
           {/* PANEL */}
-          <div className="absolute left-0 top-0 h-full w-64 bg-white p-6 flex flex-col gap-6 shadow-xl">
+          <div ref={panelRef} id="mobile-navigation" role="dialog" aria-modal="true" aria-label="Menú de navegación" className="absolute left-0 top-0 h-dvh max-h-full w-72 max-w-[90vw] overflow-y-auto overscroll-contain bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col gap-5 shadow-xl [&_a]:min-h-12 [&_a]:flex [&_a]:items-center">
 
             <button
               onClick={() => setOpen(false)}
-              className="self-end text-xl"
+              aria-label="Cerrar menú" className="self-end min-h-12 min-w-12 text-xl"
             >
               ✕
             </button>
 
             {!isAdmin && <Link href="/dashboard" onClick={() => setOpen(false)}>Inicio</Link>}
 
-            {!isDoctor && !isAdmin && (
+            {!isDoctor && !isAdmin && !isStaff && (
               <>
                 <Link href="/dashboard/doctors" onClick={() => setOpen(false)}>Mis doctores</Link>
                 <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>
+                <Link href="/dashboard/qr" onClick={() => setOpen(false)}>Mostrar código</Link>
               </>
             )}
 
-            {isDoctor && (
+            {(isDoctor || isStaff) && (
               <>
                 <Link href="/dashboard/patients" onClick={() => setOpen(false)}>Pacientes</Link>
-                <Link href="/dashboard/requests" onClick={() => setOpen(false)}>Solicitudes</Link>
-                <Link href="/dashboard/reports" onClick={() => setOpen(false)}>Reportes</Link>
+                {isDoctor && <Link href="/dashboard/requests" onClick={() => setOpen(false)}>Solicitudes</Link>}
+                {isDoctor && <Link href="/dashboard/reports" onClick={() => setOpen(false)}>Reportes</Link>}
               </>
             )}
 

@@ -39,6 +39,7 @@ export default function QRPage() {
           
             value={qrUrl}
             size={260}
+            style={{ width: "100%", maxWidth: 260, height: "auto" }}
             bgColor="#ffffff"
             fgColor="#000000"
             level="H"

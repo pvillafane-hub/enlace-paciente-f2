@@ -154,7 +154,7 @@ export default function DashboardView({ user, passkeyEnabled, canOpen }: Dashboa
 
       {/* ÚLTIMO ESTUDIO */}
       {latestDocument && (
-        <div className="max-w-5xl mx-auto mt-10 bg-white rounded-3xl shadow-soft p-8 border-l-8 border-blue-600">
+        <div className="max-w-5xl mx-auto mt-10 bg-white rounded-3xl shadow-soft p-4 sm:p-8 border-l-8 border-blue-600">
 
           <h2 className="text-2xl font-bold mb-4">
             Tu último estudio médico
@@ -235,7 +235,7 @@ export default function DashboardView({ user, passkeyEnabled, canOpen }: Dashboa
 
 
         {sortedDocuments.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 shadow-soft text-center text-gray-500 text-lg">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-soft text-center text-gray-500 text-lg">
             No tienes documentos cargados todavía.
           </div>
         ) : (

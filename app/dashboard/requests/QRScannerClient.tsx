@@ -11,7 +11,7 @@ function Scanner({ onFound }: { onFound: (patient: Patient) => void }) {
   const [loading, setLoading] = useState(false)
   useEffect(() => {
     let busy = false, disposed = false
-    const scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: 250 }, false)
+    const scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: (width, height) => { const size = Math.max(1, Math.floor(Math.min(width, height, 340) * 0.7)); return { width: size, height: size } }, videoConstraints: { facingMode: { ideal: 'environment' } } }, false)
     scanner.render(async decoded => {
       if (busy || disposed) return
       busy = true; setLoading(true); setError('')
@@ -32,7 +32,7 @@ function Scanner({ onFound }: { onFound: (patient: Patient) => void }) {
     }, () => {})
     return () => { disposed = true; void scanner.clear().catch(() => {}) }
   }, [onFound])
-  return <div><div id="reader" />{loading && <p role="status">Buscando paciente…</p>}{error && <p role="alert" className="text-red-700">{error}</p>}</div>
+  return <div><p className="mb-3">Permite el acceso a la cámara y apunta al código con la cámara trasera. Si la cámara está bloqueada, revisa los permisos del navegador o solicita acceso por correo.</p><div id="reader" className="w-full max-w-full overflow-hidden" />{loading && <p role="status">Buscando paciente…</p>}{error && <p role="alert" className="text-red-700">{error}</p>}</div>
 }
 
 export default function QRScannerClient() {
@@ -53,7 +53,7 @@ export default function QRScannerClient() {
   return <div className="space-y-4">
     {!patient ? <Scanner onFound={setPatient} /> : <div className="border p-4 rounded-lg bg-gray-50">
       <p className="font-semibold">{patient.name}</p><p>{patient.email}</p>
-      <div className="flex gap-3 mt-3">
+      <div className="flex flex-wrap gap-3 mt-3">
         <button disabled={sending} onClick={requestAccess} className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">{sending ? 'Enviando…' : 'Solicitar acceso'}</button>
         <button disabled={sending} onClick={() => { setPatient(null); setMessage('') }} className="border px-4 py-2 rounded-lg">Escanear otro paciente</button>
       </div>

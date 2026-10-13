@@ -75,10 +75,10 @@ export default function DocumentSearch({ documents }: any) {
 
             <div
               key={doc.id}
-              className="border rounded-lg p-4 flex justify-between items-center hover:bg-gray-50 transition"
+              className="border rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-gray-50 transition"
             >
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0 w-full">
 
                 {/* PREVIEW SOLO SI ES DEMO */}
                 {isDemoDoc && (
@@ -88,9 +88,9 @@ export default function DocumentSearch({ documents }: any) {
                   />
                 )}
 
-                <div>
+                <div className="min-w-0 [overflow-wrap:anywhere]">
 
-                  <p className="font-semibold">
+                  <p className="font-semibold break-words [overflow-wrap:anywhere]">
                     {doc.filename}
                   </p>
 

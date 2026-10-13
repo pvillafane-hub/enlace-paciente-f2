@@ -135,7 +135,7 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
           Historial de solicitudes ({totalRequests})
         </h2>
 
-        <form method="GET" className="flex gap-3 mb-4">
+        <form method="GET" className="flex flex-wrap gap-3 mb-4">
           <select name="status" defaultValue={status || ''} aria-label="Estado de la solicitud" className="border p-2 rounded">
             <option value="">Todos los estados</option><option value="PENDING">Pendientes</option><option value="APPROVED">Autorizadas</option><option value="REJECTED">Rechazadas</option>
           </select><button className="border p-2 rounded">Filtrar</button>
@@ -152,7 +152,7 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
 
             <div
               key={req.id}
-              className="border rounded-lg p-4 flex justify-between items-start md:items-center gap-4 hover:shadow-md transition"
+              className="border rounded-lg p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition"
             >
 
               {/* INFO */}

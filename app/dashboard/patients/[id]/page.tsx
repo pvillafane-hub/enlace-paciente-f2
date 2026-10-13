@@ -182,7 +182,7 @@ export default async function PatientPage({
       {/* HEADER */}
       <div className="bg-white rounded-xl p-6 shadow-sm border">
 
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between items-start">
 
           <div>
             <h1 className="text-3xl font-bold">{patient.fullName}</h1>
@@ -271,7 +271,7 @@ export default async function PatientPage({
             {meds.map((doc: any) => (
               <div
                 key={doc.id}
-                className="flex justify-between items-center border rounded-lg p-3"
+                className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border rounded-lg p-3"
               >
                 <div>
                   <p className="font-medium">{doc.filename}</p>

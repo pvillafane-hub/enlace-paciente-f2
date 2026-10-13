@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useRef } from 'react'
+import { uploadSelectionError, MOBILE_UPLOAD_MAX_BYTES } from '@/lib/mobile-upload-policy'
 import imageCompression from "browser-image-compression"
 
 export default function UploadPage() {
@@ -13,6 +14,9 @@ export default function UploadPage() {
   const patientId = searchParams?.get("patientId") || null
 
   const [loading, setLoading] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const selectionVersion = useRef(0)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const [saved, setSaved] = useState(false)
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -34,6 +38,26 @@ export default function UploadPage() {
   const docTypeRef = useRef<HTMLSelectElement>(null)
   const facilityRef = useRef<HTMLInputElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
+
+  async function selectFile(file?: File) {
+    if (!file) return
+    const version = ++selectionVersion.current
+    setSelectedFile(null); setFileName('Preparando archivo…'); setProcessing(true)
+    setErrors(prev => ({ ...prev, file: undefined }))
+    try {
+      const invalid = uploadSelectionError(file)
+      if (invalid) throw new Error(invalid)
+      let prepared = file
+      if (file.type.startsWith('image/')) {
+        try { prepared = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true, fileType: 'image/jpeg' }) }
+        catch { prepared = file }
+      }
+      if (prepared.size > MOBILE_UPLOAD_MAX_BYTES) throw new Error('El archivo supera 4 MB. Selecciona uno más pequeño o toma una foto.')
+      if (version === selectionVersion.current) { setSelectedFile(prepared); setFileName(file.name) }
+    } catch (error) {
+      if (version === selectionVersion.current) { setFileName('Ningún archivo seleccionado'); setErrors(prev => ({ ...prev, file: error instanceof Error ? error.message : 'No se pudo preparar el archivo.' })) }
+    } finally { if (version === selectionVersion.current) setProcessing(false) }
+  }
 
   function validateField(name: string, value: any) {
 
@@ -66,6 +90,7 @@ export default function UploadPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
 
     e.preventDefault()
+    if (loading || processing || saved) return
 
     setErrors({})
     setSaved(false)
@@ -160,9 +185,8 @@ export default function UploadPage() {
         }, 1500)
 
       } else {
-        setErrors({
-          file: "No se pudo guardar el documento. Intente nuevamente."
-        })
+        const result = await res.json().catch(() => null)
+        setErrors({ file: result?.error || (res.status === 413 ? 'El archivo es demasiado grande. Selecciona uno de hasta 4 MB.' : 'No se pudo guardar el documento. Intente nuevamente.') })
       }
 
     } catch {
@@ -177,7 +201,7 @@ export default function UploadPage() {
   return (
     <div className="max-w-2xl mx-auto">
 
-      <div className="bg-white rounded-2xl p-8 shadow-md">
+      <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-md">
 
         <h2 className="text-3xl font-bold mb-4">
           {patientId ? "Subir documento del paciente" : "Subir estudio médico"}
@@ -219,36 +243,17 @@ export default function UploadPage() {
               type="file"
               name="file"
               accept="image/jpeg,image/png,image/webp,.pdf"
-              onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-
-                try {
-                  if (file.type.startsWith("image/")) {
-                    const compressedFile = await imageCompression(file, {
-                      maxSizeMB: 1,
-                      maxWidthOrHeight: 1600,
-                      useWebWorker: true,
-                    })
-
-                    setSelectedFile(compressedFile)
-                    setFileName(compressedFile.name || file.name)
-                  } else {
-                    setSelectedFile(file)
-                    setFileName(file.name)
-                  }
-                } catch {
-                  setSelectedFile(file)
-                  setFileName(file.name)
-                }
-              }}
+              disabled={loading || processing || saved}
+              onChange={e => { void selectFile(e.target.files?.[0]); e.target.value = '' }}
               className="mt-3 block w-full"
             />
 
-            <p className="text-gray-600">{fileName}</p><p className="text-sm text-gray-500">PDF, JPEG, PNG o WebP; máximo 4 MB.</p>
+            <input ref={cameraRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" tabIndex={-1} aria-label="Tomar foto del documento" onChange={e => { void selectFile(e.target.files?.[0]); e.target.value = '' }} />
+            <button type="button" disabled={loading || processing || saved} onClick={() => cameraRef.current?.click()} className="mt-4 min-h-12 w-full rounded-xl border border-blue-700 px-4 py-3 text-blue-800 disabled:opacity-50">Tomar una foto</button>
+            <p role="status" className="text-gray-600 break-words">{processing ? 'Preparando foto. Espera antes de guardar.' : fileName}</p><p className="text-sm text-gray-500">PDF, JPEG, PNG o WebP; máximo 4 MB.</p>
 
             {errors.file && (
-              <p className="mt-2 text-red-700 font-semibold">
+              <p role="alert" className="mt-2 text-red-700 font-semibold">
                 ⚠ {errors.file}
               </p>
             )}
@@ -293,7 +298,7 @@ export default function UploadPage() {
             </select>
 
             {errors.docType && (
-              <p className="mt-2 text-red-700 font-semibold">
+              <p role="alert" className="mt-2 text-red-700 font-semibold">
                 ⚠ {errors.docType}
               </p>
             )}
@@ -369,7 +374,7 @@ export default function UploadPage() {
               </select>
 
               {errors.specialty && (
-                <p className="mt-2 text-red-700 font-semibold">
+                <p role="alert" className="mt-2 text-red-700 font-semibold">
                   ⚠ {errors.specialty}
                 </p>
               )}
@@ -392,7 +397,7 @@ export default function UploadPage() {
             />
 
             {errors.facility && (
-              <p className="mt-2 text-red-700 font-semibold">
+              <p role="alert" className="mt-2 text-red-700 font-semibold">
                 ⚠ {errors.facility}
               </p>
             )}
@@ -414,7 +419,7 @@ export default function UploadPage() {
             />
 
             {errors.studyDate && (
-              <p className="mt-2 text-red-700 font-semibold">
+              <p role="alert" className="mt-2 text-red-700 font-semibold">
                 ⚠ {errors.studyDate}
               </p>
             )}
@@ -423,10 +428,10 @@ export default function UploadPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || processing || saved}
             className="p-4 rounded-xl text-2xl font-semibold w-full bg-blue-600 text-white disabled:opacity-50"
           >
-            {loading ? 'Guardando...' : 'Guardar estudio médico'}
+            {processing ? 'Preparando archivo…' : loading ? 'Guardando...' : saved ? 'Documento guardado' : 'Guardar estudio médico'}
           </button>
 
         </form>

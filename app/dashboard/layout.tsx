@@ -162,6 +162,7 @@ export default async function DashboardLayout({
           {/* 🔥 MOBILE MENU */}
           <MobileMenu
             isDoctor={isDoctor}
+            isStaff={user.role === Role.STAFF}
             isAdmin={isAdmin}
             alerts={alerts}
             NotificationBell={NotificationBell}
@@ -172,7 +173,7 @@ export default async function DashboardLayout({
 
       </nav>
 
-      <main className="max-w-6xl mx-auto p-8">
+      <main className="max-w-6xl mx-auto min-w-0 px-4 py-6 sm:p-8">
         {!isAdmin && !entitlement.active && user.email !== 'doctor_demo@enlace.com' && <div role="status" className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950">
           <p className="font-semibold">Licencia inactiva · Solo listado histórico</p>
           <p>{entitlement.cutoff && entitlement.cutoff.getTime() > 0 ? `Documentos cargados antes del ${entitlement.cutoff.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico' })}.` : 'No hay un período de licencia anterior registrado.'} No puedes abrir ni descargar archivos, enviar solicitudes o realizar nuevas acciones. Puede haber documentos posteriores no visibles. Renueva tu licencia para recuperar las funciones.</p>
