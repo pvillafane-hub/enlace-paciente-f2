@@ -125,7 +125,8 @@ export default function DocumentSearch({ documents }: any) {
               </div>
 
               <a
-                href={href}
+                aria-disabled={doc.canOpen === false}
+                href={doc.canOpen === false ? '/dashboard?checkout=license-required' : href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"

@@ -1,4 +1,5 @@
- 'use server'
+'use server'
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { clinicDoctorId } from '@/lib/access'
@@ -7,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 export async function resolveAlert(alertId: string) {
   const session = await getValidatedSession()
   if (!session) throw new Error('Unauthorized')
+  if (!(await getLicenseAccess(session.userId)).active) throw new Error('Necesitas una licencia activa')
   const user = await prisma.user.findUnique({ where: { id: session.userId } })
   const doctorId = user ? await clinicDoctorId(user) : null
   if (!doctorId || typeof alertId !== 'string') throw new Error('Unauthorized')

@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
@@ -15,6 +16,8 @@ export default async function ShareDocumentPage({
   if (!session) {
     redirect("/?auth=required")
   }
+
+  if (!(await getLicenseAccess(session.userId)).active) redirect('/dashboard?checkout=license-required')
 
   // 🔥 FIX Next 16
   const { id } = await params

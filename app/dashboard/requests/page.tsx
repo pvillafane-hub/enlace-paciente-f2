@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import Link from 'next/link'
 import { RequestStatus } from '@prisma/client'
 import { sendRequest } from './actions'
@@ -55,6 +56,7 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
     redirect('/dashboard')
   }
 
+  const entitlement = await getLicenseAccess(session.userId)
   const where = { doctorId: user.id, ...(status ? { status } : {}) }
   const totalRequests = await prisma.medicalAccessRequest.count({ where })
   const requests = await prisma.medicalAccessRequest.findMany({
@@ -100,10 +102,10 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
             className="border rounded-lg px-4 py-3 flex-1"
           />
 
-          <button
+          <button disabled={!entitlement.active}
             className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 w-full md:w-auto"
           >
-            Solicitar acceso
+            {entitlement.active ? 'Solicitar acceso' : 'Renueva tu licencia'}
           </button>
 
         </form>
@@ -192,7 +194,7 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
                 )}
 
                 {req.status === 'PENDING' && req.initiatedBy === 'PATIENT' && <div className="flex flex-wrap gap-3 mt-3">
-                  <form action={acceptInvitation}><input type="hidden" name="requestId" value={req.id} /><button className="bg-green-700 text-white px-4 py-3 rounded">Aceptar invitación</button></form>
+                  <form action={acceptInvitation}><input type="hidden" name="requestId" value={req.id} /><button disabled={!entitlement.active} className="bg-green-700 text-white px-4 py-3 rounded">Aceptar invitación</button></form>
                   <form action={rejectInvitation}><input type="hidden" name="requestId" value={req.id} /><button className="bg-red-100 text-red-800 px-4 py-3 rounded">Rechazar</button></form>
                 </div>}
                 {req.status === 'PENDING' && req.initiatedBy === null && <p className="mt-2 font-normal">El paciente debe confirmar o reenviar su invitación.</p>}

@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { canReadPatient } from '@/lib/access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
@@ -25,9 +26,11 @@ export default async function MedicationsPage({
   const actor = await prisma.user.findUnique({ where: { id: session.userId } })
   if (!actor || !await canReadPatient(actor, patientId)) redirect('/dashboard')
 
+  const entitlement = await getLicenseAccess(session.userId)
+
   const patient = await prisma.user.findUnique({
     where: { id: patientId },
-    include: { documents: { where: { deletedAt: null, docType: 'Medicamentos' } } }
+    include: { documents: { where: { deletedAt: null, ...entitlement.documentWhere, docType: 'Medicamentos' } } }
   })
 
   if (!patient) {
@@ -57,7 +60,7 @@ export default async function MedicationsPage({
 
           <a
             key={m.id}
-            href={`/api/documents/view?id=${m.id}`}
+            href={entitlement.active ? `/api/documents/view?id=${m.id}` : "/dashboard?checkout=license-required"}
             target="_blank"
             className="block bg-gray-50 rounded-lg p-3 hover:shadow transition"
           >

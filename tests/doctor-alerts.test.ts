@@ -1,3 +1,5 @@
+import { getLicenseAccess } from '@/lib/license-access'
+vi.mock('@/lib/license-access', () => ({ getLicenseAccess: vi.fn().mockResolvedValue({ active: true, cutoff: null, documentWhere: {} }) }))
 import { beforeEach, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ session: vi.fn(), user: vi.fn(), alerts: vi.fn(), count: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ getValidatedSession: m.session }))
@@ -5,7 +7,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: m.user }, medical
 vi.mock('next/navigation', () => ({ redirect: () => { throw new Error('redirect') } }))
 import AlertsPage from '../app/dashboard/alerts/page'
 beforeEach(() => {
-  vi.resetAllMocks()
+  vi.resetAllMocks(); vi.mocked(getLicenseAccess).mockResolvedValue({ active: true, cutoff: null, documentWhere: {} })
   m.session.mockResolvedValue({ userId: 'doctor' })
   m.user.mockResolvedValue({ id: 'doctor', role: 'DOCTOR', active: true })
   m.alerts.mockResolvedValue([]); m.count.mockResolvedValue(0)

@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { getValidatedSession } from '@/lib/auth'
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
@@ -6,6 +7,7 @@ export async function POST(req: Request) {
   try {
     const session = await getValidatedSession()
     if (!session || !await prisma.user.findFirst({ where: { id: session.userId, role: 'DOCTOR', active: true }, select: { id: true } })) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    if (!(await getLicenseAccess(session.userId)).active) return NextResponse.json({ error: 'Necesitas una licencia activa' }, { status: 403 })
     const { token } = await req.json()
 
     if (typeof token !== 'string' || token.length > 128) {

@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
@@ -22,6 +23,8 @@ export default async function ReportsPage() {
     redirect("/dashboard")
   }
 
+  const entitlement = await getLicenseAccess(doctor.id)
+
   const patients = await prisma.doctorPatient.findMany({
     where: {
       doctorId: doctor.id,
@@ -37,7 +40,7 @@ export default async function ReportsPage() {
 
   const documents = await prisma.document.findMany({
     where: {
-      deletedAt: null,
+      deletedAt: null, ...entitlement.documentWhere,
       userId: {
         in: patientIds
       }
@@ -52,12 +55,12 @@ export default async function ReportsPage() {
     take: 20
   })
 
-  const totalDocuments = await prisma.document.count({ where: { deletedAt: null, userId: { in: patientIds } } })
+  const totalDocuments = await prisma.document.count({ where: { deletedAt: null, ...entitlement.documentWhere, userId: { in: patientIds } } })
 
   const documentsByType = await prisma.document.groupBy({
     by: ["docType"],
     where: {
-      deletedAt: null,
+      deletedAt: null, ...entitlement.documentWhere,
       userId: {
         in: patientIds
       }
@@ -76,7 +79,7 @@ export default async function ReportsPage() {
   const activity = await prisma.document.groupBy({
     by: ["userId"],
     where: {
-      deletedAt: null,
+      deletedAt: null, ...entitlement.documentWhere,
       userId: { in: patientIds }
     },
     _max: {

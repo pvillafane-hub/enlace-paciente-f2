@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import formidable, { type Fields, type Files } from 'formidable'
 import { readFile, unlink } from 'node:fs/promises'
@@ -14,6 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
   const session = await getApiSession(req.cookies.pp_session)
   if (!session) return res.status(401).json({ error: 'No autorizado' })
+    if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'Necesitas una licencia activa para esta acción', code: 'LICENSE_REQUIRED' })
   const paths = new Set<string>()
   const form = formidable({ multiples: false, maxFiles: 1, maxFileSize: MAX_UPLOAD_BYTES, maxTotalFileSize: MAX_UPLOAD_BYTES, maxFields: 10, maxFieldsSize: 8192, allowEmptyFiles: false })
   form.on('fileBegin', (_name, file) => paths.add(file.filepath))

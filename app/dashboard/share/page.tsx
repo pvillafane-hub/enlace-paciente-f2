@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
@@ -9,6 +10,7 @@ export default async function SharePage() {
   const session = await getValidatedSession()
   if (!session) redirect('/login')
 
+  if (!(await getLicenseAccess(session.userId)).active) redirect('/dashboard?checkout=license-required')
   const userId = session.userId
 
   const documents = await db.document.findMany({

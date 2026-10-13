@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { canReadPatient } from '@/lib/access'
 import Link from 'next/link'
 import DocumentSearch from '@/components/DocumentSearch'
@@ -69,6 +70,8 @@ export default async function PatientPage({
 
   }
 
+  const entitlement = await getLicenseAccess(session.userId)
+
   let patient
 
   if (isDemo) {
@@ -92,7 +95,7 @@ export default async function PatientPage({
             createdAt: new Date(),
             filePath: "/demo/docs/radiografia.jpg",
             userId: "demo",
-            deletedAt: null,
+            deletedAt: null, ...entitlement.documentWhere,
           }
         ]
       }
@@ -117,7 +120,7 @@ export default async function PatientPage({
             createdAt: new Date(),
             filePath: "/demo/docs/laboratorio-maria-del-carmen.jpg",
             userId: "demo",
-            deletedAt: null,
+            deletedAt: null, ...entitlement.documentWhere,
           }
         ]
       }
@@ -142,7 +145,7 @@ export default async function PatientPage({
       where: { id: patientId },
       include: {
         documents: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, ...entitlement.documentWhere },
           orderBy: { studyDate: 'desc' }
         }
       }
@@ -185,7 +188,7 @@ export default async function PatientPage({
             <h1 className="text-3xl font-bold">{patient.fullName}</h1>
             <p className="text-gray-500 mt-1">{patient.email}</p>
 
-            {latestDoc && (
+            {latestDoc && (entitlement.active || isDemo) && (
               <p className="text-sm text-gray-500 mt-2">
                 Fecha del estudio más reciente ·{" "}
                 {new Date(latestDoc.studyDate).toLocaleDateString('es-PR')}
@@ -193,7 +196,7 @@ export default async function PatientPage({
             )}
           </div>
 
-          {latestDoc && (
+          {latestDoc && (entitlement.active || isDemo) && (
             <a
               href={`/api/documents/view?id=${latestDoc.id}`}
               target="_blank"
@@ -218,7 +221,7 @@ export default async function PatientPage({
         </p>
 
         <Link
-          href={`/dashboard/upload?patientId=${patient.id}`}
+          href={entitlement.active || isDemo ? `/dashboard/upload?patientId=${patient.id}` : "/dashboard?checkout=license-required"}
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
         >
           Subir documento
@@ -234,7 +237,7 @@ export default async function PatientPage({
           <div className="bg-blue-50 p-4 rounded-xl">
             <p className="text-sm text-gray-500">Fecha de nacimiento</p>
             <p className="text-lg font-semibold">
-              {patient.dateOfBirth
+              {!(entitlement.active || isDemo) ? 'Licencia requerida' : patient.dateOfBirth
                 ? new Date(patient.dateOfBirth).toLocaleDateString('es-PR')
                 : "No registrada"}
             </p>
@@ -242,17 +245,17 @@ export default async function PatientPage({
 
           <div className="bg-red-50 p-4 rounded-xl">
             <p className="text-sm text-gray-500">Tipo de sangre</p>
-            <p className="text-lg font-semibold">{patient.bloodType || "No registrado"}</p>
+            <p className="text-lg font-semibold">{entitlement.active || isDemo ? patient.bloodType || 'No registrado' : 'Licencia requerida'}</p>
           </div>
 
           <div className={`p-4 rounded-xl ${
-            patient.allergies
+            (entitlement.active || isDemo) && patient.allergies
               ? "bg-red-100 border-2 border-red-400"
               : "bg-gray-50 border border-gray-200"
           }`}>
             <p className="text-sm text-gray-500">Alergias</p>
             <p className="text-lg font-semibold">
-              {patient.allergies || "No registradas"}
+              {entitlement.active || isDemo ? patient.allergies || 'No registradas' : 'Licencia requerida'}
             </p>
           </div>
 
@@ -278,7 +281,7 @@ export default async function PatientPage({
                 </div>
 
                 <a
-                  href={`/api/documents/view?id=${doc.id}`}
+                  href={entitlement.active || isDemo ? `/api/documents/view?id=${doc.id}` : "/dashboard?checkout=license-required"}
                   target="_blank"
                   className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700"
                 >
@@ -301,6 +304,8 @@ export default async function PatientPage({
         <DocumentSearch
           documents={patient.documents.map((doc: any) => ({
             ...doc,
+            filePath: entitlement.active || isDemo ? doc.filePath : '',
+            canOpen: entitlement.active || isDemo,
             studyDate:
               doc.studyDate instanceof Date
                 ? doc.studyDate.toISOString()

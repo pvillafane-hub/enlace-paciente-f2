@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { canReadPatient } from '@/lib/access'
 import { auditLog } from '@/lib/audit'
 import { getApiSession } from '@/lib/api-auth'
@@ -34,6 +35,7 @@ export default async function handler(
       return res.status(401).json({ error: "Sesión inválida (sin usuario)" })
     }
 
+    if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'Necesitas una licencia activa para esta acción', code: 'LICENSE_REQUIRED' })
     const userId = session.userId
 
     // 📄 VALIDAR ID

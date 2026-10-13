@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { validDateOnly } from '@/lib/file-policy'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
     }
 
     const userId = session.userId
+    if (!(await getLicenseAccess(userId)).active) return NextResponse.json({ error: 'Necesitas una licencia activa para modificar el expediente' }, { status: 403 })
 
     const body = await req.json()
     const { dateOfBirth, bloodType, allergies } = body

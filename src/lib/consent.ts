@@ -1,6 +1,8 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from '@/lib/prisma'
 
 export async function decideAccess(patientId: string, requestId: string, approved: boolean) {
+  if (approved && !(await getLicenseAccess(patientId)).active) throw new Error('Necesitas una licencia activa para solicitar o autorizar nuevos accesos')
   return prisma.$transaction(async tx => {
     const patient = await tx.user.findFirst({ where: { id: patientId, role: 'PATIENT', active: true }, select: { id: true } })
     if (!patient) throw new Error('Unauthorized')
@@ -22,6 +24,7 @@ export async function decideAccess(patientId: string, requestId: string, approve
 }
 
 export async function requestPatientAccess(doctorId: string, patientId: string) {
+  if (!(await getLicenseAccess(doctorId)).active) throw new Error('Necesitas una licencia activa para solicitar o autorizar nuevos accesos')
   return prisma.$transaction(async tx => {
     const doctor = await tx.user.findFirst({ where: { id: doctorId, role: 'DOCTOR', active: true }, select: { id: true } })
     const patient = await tx.user.findFirst({ where: { id: patientId, role: 'PATIENT', active: true }, select: { id: true } })
@@ -38,6 +41,7 @@ export async function requestPatientAccess(doctorId: string, patientId: string) 
 }
 
 export async function inviteDoctorAccess(patientId: string, doctorId: string) {
+  if (!(await getLicenseAccess(patientId)).active) throw new Error('Necesitas una licencia activa para solicitar o autorizar nuevos accesos')
   return prisma.$transaction(async tx => {
     const patient = await tx.user.findFirst({ where: { id: patientId, role: 'PATIENT', active: true }, select: { id: true } })
     const doctor = await tx.user.findFirst({ where: { id: doctorId, role: 'DOCTOR', active: true }, select: { id: true } })
@@ -56,6 +60,7 @@ export async function inviteDoctorAccess(patientId: string, doctorId: string) {
 }
 
 export async function decideDoctorInvitation(doctorId: string, requestId: string, approved: boolean) {
+  if (approved && !(await getLicenseAccess(doctorId)).active) throw new Error('Necesitas una licencia activa para solicitar o autorizar nuevos accesos')
   return prisma.$transaction(async tx => {
     if (!await tx.user.findFirst({ where: { id: doctorId, role: 'DOCTOR', active: true }, select: { id: true } })) throw new Error('No autorizado')
     const request = await tx.medicalAccessRequest.findFirst({

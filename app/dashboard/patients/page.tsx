@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { clinicDoctorId } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
@@ -16,6 +17,8 @@ export default async function PatientsPage() {
   const doctorId = actor ? await clinicDoctorId(actor) : null
   if (!doctorId) redirect('/dashboard')
 
+  const entitlement = await getLicenseAccess(session.userId)
+
   const patientsData = await prisma.doctorPatient.findMany({
     where: {
       doctorId,
@@ -25,7 +28,7 @@ export default async function PatientsPage() {
       patient: {
         include: {
           documents: {
-            where: { deletedAt: null },
+            where: { deletedAt: null, ...entitlement.documentWhere },
             orderBy: {
               createdAt: 'desc'
             },

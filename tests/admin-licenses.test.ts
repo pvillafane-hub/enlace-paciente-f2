@@ -57,13 +57,14 @@ it('stale edits are rejected before overwriting a license', async () => {
 it('changing a license audits before/after and deactivates older active alternatives', async () => {
   m.licenses.mockResolvedValue([{ ...previous, id: 'older' }])
   expect((await modifyLicense(previous.id, licenseRevision(previous), {}, form())).success).toBeTruthy()
-  expect(m.updateMany).toHaveBeenCalledWith({ where: { userId: 'doctor', status: 'ACTIVE', id: { not: 'license' } }, data: { status: 'INACTIVE' } })
+  expect(m.update).toHaveBeenCalledWith({ where: { id: 'older' }, data: { status: 'INACTIVE', validUntil: expect.any(Date) } })
   expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'ADMIN_LICENSE_UPDATED', metadata: expect.objectContaining({ before: expect.objectContaining({ plan: 'BASIC' }), after: expect.objectContaining({ plan: 'PRO' }), deactivatedPreviousLicenses: [expect.objectContaining({ id: 'older' })] }) }) })
 })
 it('disable affects all licenses of that account without deleting documents or the account', async () => {
   m.licenses.mockResolvedValue([previous, { ...previous, id: 'older' }])
   expect((await disableLicense(previous.id, licenseRevision(previous), {}, form())).success).toBeTruthy()
-  expect(m.updateMany).toHaveBeenCalledWith({ where: { userId: 'doctor', status: { not: 'INACTIVE' } }, data: { status: 'INACTIVE' } })
+  expect(m.update).toHaveBeenCalledWith({ where: { id: 'license' }, data: { status: 'INACTIVE', validUntil: expect.any(Date) } })
+  expect(m.update).toHaveBeenCalledWith({ where: { id: 'older' }, data: { status: 'INACTIVE', validUntil: expect.any(Date) } })
   expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'ADMIN_LICENSE_DISABLED', metadata: expect.objectContaining({ targetUserId: 'doctor', before: expect.arrayContaining([expect.objectContaining({ id: 'older' })]) }) }) })
 })
 it('rejects missing reasons and invalid dates before writes', async () => {

@@ -1,3 +1,5 @@
+import { getLicenseAccess } from '@/lib/license-access'
+vi.mock('@/lib/license-access', () => ({ getLicenseAccess: vi.fn().mockResolvedValue({ active: true, cutoff: null, documentWhere: {} }) }))
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { validPassword } from '../src/lib/password-policy'
 import { detectDocumentType, validDateOnly } from '../src/lib/file-policy'
@@ -23,7 +25,7 @@ import { canReadPatient } from '../src/lib/access'
 import resetHandler from '../pages/api/auth/reset-password'
 
 beforeEach(() => {
-  vi.resetAllMocks()
+  vi.resetAllMocks(); vi.mocked(getLicenseAccess).mockResolvedValue({ active: true, cutoff: null, documentWhere: {} })
   db.$transaction.mockImplementation(async fn => fn(db))
   db.auditLog.create.mockResolvedValue({})
 })

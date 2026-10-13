@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { decideAccess } from '@/lib/consent'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
@@ -48,6 +49,7 @@ export default async function RequestsPage() {
   if (!actor) redirect('/dashboard')
   const userId = session.userId
 
+  const entitlement = await getLicenseAccess(session.userId)
   const requests = await prisma.medicalAccessRequest.findMany({
     where: {
       patientId: userId,
@@ -124,7 +126,7 @@ export default async function RequestsPage() {
                     value={req.id}
                   />
 
-                  <button className="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 w-full sm:w-auto">
+                  <button disabled={!entitlement.active} className="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 w-full sm:w-auto">
                     Aprobar
                   </button>
 

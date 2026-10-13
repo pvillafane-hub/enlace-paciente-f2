@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { unstable_noStore as noStore } from 'next/cache'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
@@ -15,6 +16,7 @@ export default async function DoctorsPage({ searchParams }: { searchParams: Prom
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, role: true, active: true } })
   if (user?.role === 'DOCTOR' && user.active) redirect('/dashboard/requests')
   if (!user?.active || user.role !== 'PATIENT') redirect('/dashboard')
+  const entitlement = await getLicenseAccess(user.id)
   const params = await searchParams
   const page = /^\d{1,4}$/.test(params.page || '') ? Math.max(1, Number(params.page)) : 1
   const where = { patientId: user.id }
@@ -27,7 +29,7 @@ export default async function DoctorsPage({ searchParams }: { searchParams: Prom
     <h1 className="text-2xl font-bold">Gestión de acceso médico</h1>
     <section className="bg-white border rounded-xl p-6 space-y-4">
       <h2 className="text-lg font-semibold">Invitar a mi doctor</h2>
-      <InviteForm />
+      {entitlement.active ? <InviteForm /> : <p>Renueva tu licencia para enviar invitaciones.</p>}
       <p>Al enviar la invitación autorizas compartir tu expediente con ese doctor. El acceso comienza cuando el doctor acepte.</p>
       <Link href="/dashboard/qr" className="text-blue-600 underline">Mostrar código al doctor</Link>
     </section>

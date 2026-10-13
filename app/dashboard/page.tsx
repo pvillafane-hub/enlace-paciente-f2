@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import Link from "next/link"
 import DashboardView from "./DashboardView"
 import { prisma } from "@/lib/prisma"
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic"
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const { checkout } = await searchParams
   const checkoutMessage: Record<string, string> = {
+    'license-required': 'Necesitas una licencia activa para abrir archivos o realizar nuevas acciones.',
     unavailable: 'Los pagos aún no están configurados en esta versión. Contacta al administrador para activar este servicio.',
     failed: 'No fue posible abrir la página de pago. Intenta nuevamente o contacta al administrador.',
     'rate-limited': 'Has realizado varios intentos de pago. Espera unos minutos antes de intentar de nuevo.',
@@ -25,10 +27,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     redirect("/?auth=required")
   }
 
+  const entitlement = await getLicenseAccess(session.userId)
   const userData = await prisma.user.findUnique({
     where: { id: session.userId },
     include: {
-      documents: { where: { deletedAt: null } }
+      documents: { where: { deletedAt: null, ...entitlement.documentWhere } }
     }
   })
 
@@ -134,7 +137,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           patient: {
             include: {
               documents: {
-                where: { deletedAt: null },
+                where: { deletedAt: null, ...entitlement.documentWhere },
                 orderBy: { createdAt: "desc" },
                 take: 5
               }
@@ -336,6 +339,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     createdAt: userData.createdAt,
     documents: userData.documents.map(doc => ({
       ...doc,
+      filePath: '',
       studyDate: new Date(doc.studyDate)
     }))
   }
@@ -362,7 +366,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <DashboardView user={user} passkeyEnabled={passkeyEnabled} />
+      <DashboardView user={user} passkeyEnabled={passkeyEnabled} canOpen={entitlement.active} />
 
     </div>
   )

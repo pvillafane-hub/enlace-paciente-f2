@@ -1,3 +1,5 @@
+import { getLicenseAccess } from '@/lib/license-access'
+vi.mock('@/lib/license-access', () => ({ getLicenseAccess: vi.fn().mockResolvedValue({ active: true, cutoff: null, documentWhere: {} }) }))
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(), parse: vi.fn(),
@@ -17,7 +19,7 @@ function res() {
   const r = { status: vi.fn(), json: vi.fn(), end: vi.fn() }
   r.status.mockReturnValue(r); r.json.mockReturnValue(r); return r
 }
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => { vi.resetAllMocks(); vi.mocked(getLicenseAccess).mockResolvedValue({ active: true, cutoff: null, documentWhere: {} }) })
 it('unauthenticated upload is rejected before parsing multipart content', async () => {
   mocks.getSession.mockResolvedValue(null)
   const response = res()

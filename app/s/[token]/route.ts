@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { prisma } from '@/lib/prisma'
 import { readDocument } from '@/lib/document-storage'
 
@@ -8,6 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   if (!token || token.length > 256) return new Response('Enlace inválido', { status: 404, headers })
   const share = await prisma.shareLink.findUnique({ where: { token }, include: { document: { include: { user: { select: { active: true } } } } } })
   if (!share || share.expiresAt <= new Date() || share.document.deletedAt || !share.document.user.active) return new Response('Enlace expirado o documento no disponible', { status: 404, headers })
+  if (!(await getLicenseAccess(share.document.userId)).active) return new Response('Documento no disponible: licencia inactiva', { status: 403, headers })
   try {
     const file = await readDocument(share.document.filePath)
     if (!file || file.statusCode !== 200) return new Response('Documento no disponible', { status: 404, headers })

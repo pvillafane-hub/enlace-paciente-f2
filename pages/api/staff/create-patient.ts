@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
@@ -10,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const session = await getApiSession(req.cookies.pp_session)
     if (!session) return res.status(401).json({ error: 'No autenticado' })
+    if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'Necesitas una licencia activa para esta acción', code: 'LICENSE_REQUIRED' })
     const doctorId = await clinicDoctorId(session.user)
     if (!doctorId) return res.status(403).json({ error: 'No autorizado' })
     const { fullName, email } = req.body ?? {}

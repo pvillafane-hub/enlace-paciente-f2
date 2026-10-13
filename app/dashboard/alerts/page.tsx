@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { clinicDoctorId } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
@@ -26,6 +27,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
   const doctorId = actor ? await clinicDoctorId(actor) : null
   if (!doctorId) redirect('/dashboard')
 
+  if (!(await getLicenseAccess(session.userId)).active) return <p>Las alertas requieren una licencia activa. Puedes consultar el listado histórico desde Pacientes.</p>
   const where = { doctorId, patient: { active: true, role: 'PATIENT' as const, patientDoctors: { some: { doctorId } } } }
   const [activeAlerts, resolvedAlerts, activeCount, resolvedCount] = await Promise.all([
     prisma.medicalAlert.findMany({ where: { ...where, resolved: false }, include: { patient: true }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50, skip: (page - 1) * 50 }),

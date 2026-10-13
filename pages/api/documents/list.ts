@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma'
@@ -26,12 +27,13 @@ export default async function handler(
 
     const userId = session.userId
 
+    const entitlement = await getLicenseAccess(userId)
     const limit = req.query.limit === undefined ? 50 : Number(req.query.limit)
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return res.status(400).json({ error: 'Limit inválido' })
-    if (cursor && !await prisma.document.findFirst({ where: { id: cursor, userId, deletedAt: null }, select: { id: true } })) return res.status(400).json({ error: 'Cursor inválido' })
+    if (cursor && !await prisma.document.findFirst({ where: { id: cursor, userId, deletedAt: null, ...entitlement.documentWhere }, select: { id: true } })) return res.status(400).json({ error: 'Cursor inválido' })
     const documents = await prisma.document.findMany({
-      where: { userId, deletedAt: null },
+      where: { userId, deletedAt: null, ...entitlement.documentWhere },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -41,7 +43,7 @@ export default async function handler(
     const page = documents.slice(0, limit)
     if (hasMore) res.setHeader('X-Next-Cursor', page[page.length - 1].id)
     res.setHeader('Cache-Control', 'private, no-store')
-    return res.status(200).json(page)
+    return res.status(200).json(page.map(doc => ({ ...doc, filePath: undefined, canOpen: entitlement.active })))
 
   } catch (err) {
     console.error('LIST DOCUMENTS ERROR:', err)

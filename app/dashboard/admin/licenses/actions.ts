@@ -23,7 +23,7 @@ export async function addLicense(_state: LicenseActionState, data: FormData): Pr
       const user = await tx.user.findUnique({ where: { email: email.trim().toLowerCase() }, select: { id: true, role: true, active: true } })
       if (!user?.active || !['DOCTOR', 'PATIENT'].includes(user.role)) throw new LicenseInputError('La cuenta debe estar activa y tener rol Doctor o Paciente.')
       if (await tx.license.findFirst({ where: { userId: user.id }, select: { id: true } })) throw new LicenseInputError('Esta cuenta ya tiene una licencia. Búscala en la lista y utiliza Modificar.')
-      const license = await tx.license.create({ data: { userId: user.id, role: user.role, status: input.status, plan: input.plan, validUntil: input.validUntil } })
+      const license = await tx.license.create({ data: { userId: user.id, role: user.role, status: input.status, plan: input.plan, validUntil: input.status === 'ACTIVE' ? input.validUntil : new Date(0) } })
       await tx.auditLog.create({ data: { userId: admin.id, entityId: license.id, action: 'ADMIN_LICENSE_CREATED', metadata: { source: 'manual', reason: input.reason, before: null, after: licenseSnapshot(license) } } })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     refreshLicenses()
@@ -43,8 +43,8 @@ export async function modifyLicense(id: string, expectedRevision: string, _state
       if (input.status === 'ACTIVE' && (!user.active || !['DOCTOR', 'PATIENT'].includes(user.role))) throw new LicenseInputError('Solo puedes activar una licencia de Doctor o Paciente con cuenta activa.')
       const replaced = await tx.license.findMany({ where: { userId: previous.userId, status: 'ACTIVE', id: { not: id } } })
       // Never let an older active license silently restore access after a manual change.
-      await tx.license.updateMany({ where: { userId: previous.userId, status: 'ACTIVE', id: { not: id } }, data: { status: 'INACTIVE' } })
-      const current = await tx.license.update({ where: { id }, data: { plan: input.plan, status: input.status, validUntil: input.validUntil, role: ['DOCTOR', 'PATIENT'].includes(user.role) ? user.role : previous.role } })
+      for (const license of replaced) await tx.license.update({ where: { id: license.id }, data: { status: 'INACTIVE', validUntil: license.validUntil && license.validUntil < new Date() ? license.validUntil : new Date() } })
+      const current = await tx.license.update({ where: { id }, data: { plan: input.plan, status: input.status, validUntil: input.status === 'ACTIVE' ? input.validUntil : previous.status === 'ACTIVE' ? previous.validUntil && previous.validUntil < new Date() ? previous.validUntil : new Date() : previous.validUntil && previous.validUntil < new Date() ? previous.validUntil : new Date(0), role: ['DOCTOR', 'PATIENT'].includes(user.role) ? user.role : previous.role } })
       await tx.auditLog.create({ data: { userId: admin.id, entityId: id, action: 'ADMIN_LICENSE_UPDATED', metadata: { source: 'manual', reason: input.reason, before: licenseSnapshot(previous), after: licenseSnapshot(current), deactivatedPreviousLicenses: replaced.map(licenseSnapshot) } } })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     refreshLicenses()
@@ -62,7 +62,7 @@ export async function disableLicense(id: string, expectedRevision: string, _stat
       if (!previous || licenseRevision(previous) !== expectedRevision) throw new LicenseInputError('La licencia cambió. Actualiza la página antes de continuar.')
       const affected = await tx.license.findMany({ where: { userId: previous.userId, status: { not: 'INACTIVE' } } })
       if (!affected.length) return
-      await tx.license.updateMany({ where: { userId: previous.userId, status: { not: 'INACTIVE' } }, data: { status: 'INACTIVE' } })
+      for (const license of affected) await tx.license.update({ where: { id: license.id }, data: { status: 'INACTIVE', validUntil: license.validUntil && license.validUntil < new Date() ? license.validUntil : new Date() } })
       await tx.auditLog.create({ data: { userId: admin.id, entityId: id, action: 'ADMIN_LICENSE_DISABLED', metadata: { source: 'manual', reason: reason.trim(), targetUserId: previous.userId, before: affected.map(licenseSnapshot), after: { status: 'INACTIVE' } } } })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     refreshLicenses()

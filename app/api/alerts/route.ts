@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { clinicDoctorId } from '@/lib/access'
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
@@ -25,6 +26,7 @@ export async function GET() {
     const userId = actor ? await clinicDoctorId(actor) : null
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
+    if (!(await getLicenseAccess(session.userId)).active) return NextResponse.json([])
     const alerts = await prisma.medicalAlert.findMany({
       where: {
         doctorId: userId,

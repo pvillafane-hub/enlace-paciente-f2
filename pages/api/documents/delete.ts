@@ -1,3 +1,4 @@
+import { getLicenseAccess } from '@/lib/license-access'
 import { getApiSession } from '@/lib/api-auth'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma'
@@ -30,6 +31,7 @@ export default async function handler(
       return res.status(401).json({ error: 'Invalid session' })
     }
 
+    if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'Necesitas una licencia activa para esta acción', code: 'LICENSE_REQUIRED' })
     const document = await prisma.document.findUnique({
       where: { id: documentId },
     })

@@ -20,9 +20,10 @@ interface DashboardViewProps {
     documents: Document[];
   };
   passkeyEnabled: boolean;
+  canOpen: boolean;
 }
 
-export default function DashboardView({ user, passkeyEnabled }: DashboardViewProps) {
+export default function DashboardView({ user, passkeyEnabled, canOpen }: DashboardViewProps) {
 
   const sortedDocuments = [...user.documents].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -64,10 +65,12 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
 
   // 🔥 FIX AQUÍ
   function viewDocument(id: string) {
+    if (!canOpen) { alert('Necesitas una licencia activa para abrir documentos'); return; }
     window.open(`/api/documents/view?id=${id}`, "_blank");
   }
 
   async function deleteDocument(id: string) {
+    if (!canOpen) { alert('Necesitas una licencia activa para eliminar documentos'); return; }
 
     const confirmDelete = confirm("¿Seguro que deseas eliminar este documento?");
 
@@ -114,7 +117,7 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
           </div>
 
           <a
-            href="/dashboard/upload"
+            href={canOpen ? '/dashboard/upload' : '/dashboard?checkout=license-required'}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl text-xl font-semibold transition text-center"
           >
             + Subir documento
@@ -173,21 +176,21 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
           <div className="pt-4 flex gap-3 flex-wrap">
 
             <button
-              onClick={() => viewDocument(latestDocument.id)}
+              disabled={!canOpen} onClick={() => viewDocument(latestDocument.id)}
               className="bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-lg text-lg"
             >
               Ver estudio
             </button>
 
             <a
-              href={`/dashboard/share/${latestDocument.id}`}
+              href={canOpen ? `/dashboard/share/${latestDocument.id}` : "/dashboard?checkout=license-required"}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-lg"
             >
               Enviar a mi médico
             </a>
 
             <button
-              onClick={() => deleteDocument(latestDocument.id)}
+              disabled={!canOpen} onClick={() => deleteDocument(latestDocument.id)}
               className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-3 rounded-lg text-lg"
             >
               Eliminar
@@ -270,21 +273,21 @@ export default function DashboardView({ user, passkeyEnabled }: DashboardViewPro
                     <div className="pt-4 flex flex-wrap gap-3">
 
                       <button
-                        onClick={() => viewDocument(doc.id)}
+                        disabled={!canOpen} onClick={() => viewDocument(doc.id)}
                         className="bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-lg text-lg"
                       >
                         Ver estudio
                       </button>
 
                       <a
-                        href={`/dashboard/share/${doc.id}`}
+                        href={canOpen ? `/dashboard/share/${doc.id}` : "/dashboard?checkout=license-required"}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-lg"
                       >
                         Enviar a mi médico
                       </a>
 
                       <button
-                        onClick={() => deleteDocument(doc.id)}
+                        disabled={!canOpen} onClick={() => deleteDocument(doc.id)}
                         className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-3 rounded-lg text-lg"
                       >
                         Eliminar
