@@ -16,7 +16,7 @@ vi.mock('@/lib/document-storage', () => ({ documentStorageKey: vi.fn(), putDocum
 import createPatient from '../pages/api/staff/create-patient'
 import upload from '../pages/api/upload/create'
 function res() {
-  const r = { status: vi.fn(), json: vi.fn(), end: vi.fn() }
+  const r = { status: vi.fn(), json: vi.fn(), setHeader: vi.fn(), end: vi.fn() }
   r.status.mockReturnValue(r); r.json.mockReturnValue(r); return r
 }
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getLicenseAccess).mockResolvedValue({ active: true, cutoff: null, documentWhere: {} }) })
@@ -32,7 +32,7 @@ it('knowing an existing patient email cannot recreate revoked access', async () 
   mocks.user.findUnique.mockResolvedValue({ id: 'p', fullName: 'Synthetic', email: 'patient@example.test', role: 'PATIENT', active: true })
   mocks.doctorPatient.findUnique.mockResolvedValue(null)
   const response = res()
-  await createPatient({ method: 'POST', cookies: {}, body: { fullName: 'Synthetic', email: 'patient@example.test' } } as never, response as never)
+  await createPatient({ method: 'POST', cookies: {}, body: { fullName: 'Synthetic', email: 'patient@example.test', dateOfBirth: '1950-01-01', authorizationConfirmed: true } } as never, response as never)
   expect(response.status).toHaveBeenCalledWith(403)
   expect(mocks.transaction).not.toHaveBeenCalled()
   expect(mocks.doctorPatient.upsert).not.toHaveBeenCalled()
@@ -42,9 +42,9 @@ it('already authorized patient response excludes hash and clinical fields', asyn
   mocks.user.findUnique.mockResolvedValue({ id: 'p', fullName: 'Synthetic', email: 'patient@example.test', role: 'PATIENT', active: true, passwordHash: 'never-return', allergies: 'never-return' })
   mocks.doctorPatient.findUnique.mockResolvedValue({ id: 'relation' })
   const response = res()
-  await createPatient({ method: 'POST', cookies: {}, body: { fullName: 'Synthetic', email: 'patient@example.test' } } as never, response as never)
+  await createPatient({ method: 'POST', cookies: {}, body: { fullName: 'Synthetic', email: 'patient@example.test', dateOfBirth: '1950-01-01', authorizationConfirmed: true } } as never, response as never)
   expect(response.status).toHaveBeenCalledWith(200)
-  expect(response.json).toHaveBeenCalledWith({ success: true, patient: { id: 'p', fullName: 'Synthetic', email: 'patient@example.test' } })
+  expect(response.json).toHaveBeenCalledWith({ success: true, existing: true, patient: { id: 'p', fullName: 'Synthetic', dateOfBirth: undefined } })
   expect(mocks.doctorPatient.upsert).not.toHaveBeenCalled()
 })
 it('inactive staff affiliation cannot create patients', async () => {

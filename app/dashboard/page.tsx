@@ -225,7 +225,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <StatCard title="Sin actividad documental reciente" value={criticalPatients.length} />
         </div>
 
-        <ActivatePatientBox />
+        <ActivatePatientBox enabled={entitlement.active} />
 
         <div className="bg-white border rounded-xl p-6">
 
