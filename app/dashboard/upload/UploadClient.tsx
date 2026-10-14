@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useRef } from 'react'
+import Link from 'next/link'
+import { useState, useRef, useEffect } from 'react'
 import { uploadSelectionError, MOBILE_UPLOAD_MAX_BYTES } from '@/lib/mobile-upload-policy'
 import imageCompression from "browser-image-compression"
 
@@ -16,6 +17,19 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
   const selectionVersion = useRef(0)
   const cameraRef = useRef<HTMLInputElement>(null)
   const [saved, setSaved] = useState(false)
+  const submitting = useRef(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (saved) successRef.current?.focus() }, [saved])
+
+  function resetUpload() {
+    formRef.current?.reset()
+    setSelectedFile(null)
+    setFileName('Ningún archivo seleccionado')
+    setDocType(''); setBodyPart(''); setSpecialty(''); setErrors({})
+    setSaved(false)
+    fileRef.current?.focus()
+  }
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [bodyPart, setBodyPart] = useState("")
@@ -57,7 +71,7 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
     } finally { if (version === selectionVersion.current) setProcessing(false) }
   }
 
-  function validateField(name: string, value: any) {
+  function validateField(name: string, value: string) {
 
     let message = ''
 
@@ -88,10 +102,11 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
 
     e.preventDefault()
-    if (loading || processing || saved) return
+    if (submitting.current || loading || processing || saved) return
 
     setErrors({})
     setSaved(false)
+    submitting.current = true
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
@@ -142,6 +157,7 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
+      submitting.current = false
       setLoading(false)
       return
     }
@@ -171,16 +187,11 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
 
         setSaved(true)
 
-        setTimeout(() => {
-          // 🔥 NUEVO: si subió documento para paciente, volver al perfil del paciente
-          if (patientId) {
-            router.push(returnPath)
-          } else {
-            router.push('/dashboard')
-          }
-
-          router.refresh()
-        }, 1500)
+        formRef.current?.reset()
+        setSelectedFile(null)
+        setFileName('Ningún archivo seleccionado')
+        setDocType(''); setBodyPart(''); setSpecialty('')
+        router.refresh()
 
       } else {
         const result = await res.json().catch(() => null)
@@ -193,6 +204,7 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
       })
     }
 
+    submitting.current = false
     setLoading(false)
   }
 
@@ -225,12 +237,19 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
         {representative && <p className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">El documento se enviará a la clínica. Quedará privado para representantes hasta que la clínica revise si puede compartirse.</p>}
 
         {saved && (
-          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
-            Documento guardado correctamente.
+          <div ref={successRef} role="status" tabIndex={-1} className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+            <p className="text-xl font-semibold">{patientId ? `Documento guardado en el expediente de ${patientName}.` : 'Documento guardado correctamente.'}</p>
+            {representative && <p className="mt-3 text-lg">Podrás verlo cuando la clínica lo revise y autorice. No necesitas subirlo otra vez.</p>}
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Link href={returnPath} className="min-h-12 rounded-xl bg-blue-700 px-4 py-3 text-center text-white">Volver al expediente</Link>
+              <button type="button" onClick={resetUpload} className="min-h-12 rounded-xl border border-blue-700 px-4 py-3 text-blue-800">Subir otro documento</button>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form ref={formRef} onSubmit={handleSubmit} aria-busy={loading || processing} hidden={saved} className="space-y-8">
+          <fieldset disabled={loading || processing} className="space-y-8">
+          {loading && <p role="status" className="rounded-xl bg-blue-50 p-4 text-lg text-blue-800">Subiendo documento… Espera a que aparezca la confirmación. No cierres esta página.</p>}
 
           {/* ARCHIVO */}
 
@@ -431,9 +450,10 @@ export default function UploadClient({ patientId, patientName, patientBirth, ret
             disabled={loading || processing || saved}
             className="p-4 rounded-xl text-2xl font-semibold w-full bg-blue-600 text-white disabled:opacity-50"
           >
-            {processing ? 'Preparando archivo…' : loading ? 'Guardando...' : saved ? 'Documento guardado' : 'Guardar estudio médico'}
+            {processing ? 'Preparando archivo…' : loading ? 'Subiendo documento…' : saved ? 'Documento guardado' : 'Guardar estudio médico'}
           </button>
 
+          </fieldset>
         </form>
 
       </div>
