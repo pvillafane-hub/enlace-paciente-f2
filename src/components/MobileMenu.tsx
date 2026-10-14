@@ -72,6 +72,7 @@ export default function MobileMenu({
 
             {!isDoctor && !isAdmin && !isStaff && (
               <>
+                <Link href="/dashboard/profile" onClick={() => setOpen(false)}>Mi información de salud</Link>
                 <Link href="/dashboard/dependents" onClick={() => setOpen(false)}>Personas a mi cargo</Link>
                 <Link href="/dashboard/doctors" onClick={() => setOpen(false)}>Mis doctores</Link>
                 <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>

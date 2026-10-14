@@ -73,6 +73,7 @@ export default async function DashboardLayout({
 
             {!isDoctor && !isAdmin && (
               <>
+                <Link href="/dashboard/profile">Mi información de salud</Link>
                 <Link href="/dashboard/dependents">Personas a mi cargo</Link>
                 <Link href="/dashboard/doctors">
                   Mis doctores
