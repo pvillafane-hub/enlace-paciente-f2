@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-const m = vi.hoisted(() => ({ session: vi.fn(), license: vi.fn(), clinic: vi.fn(), hash: vi.fn(), user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() }, relation: { findUnique: vi.fn(), create: vi.fn() }, audit: vi.fn(), transaction: vi.fn() }))
+const m = vi.hoisted(() => ({ session: vi.fn(), license: vi.fn(), clinic: vi.fn(), hash: vi.fn(), user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() }, relation: { findUnique: vi.fn(), create: vi.fn() }, review: vi.fn(), audit: vi.fn(), transaction: vi.fn() }))
 vi.mock('@/lib/api-auth', () => ({ getApiSession: m.session }))
 vi.mock('@/lib/license-access', () => ({ getLicenseAccess: m.license }))
 vi.mock('@/lib/access', () => ({ clinicDoctorId: m.clinic }))
@@ -14,7 +14,7 @@ async function call(data: unknown) { const r = res(); await handler({ method: 'P
 beforeEach(() => {
   vi.resetAllMocks(); m.session.mockResolvedValue({ userId: 'employee', user: { role: 'STAFF' } }); m.license.mockResolvedValue({ active: true }); m.clinic.mockResolvedValue('doctor')
   m.user.findUnique.mockResolvedValue(null); m.user.findFirst.mockResolvedValue(null); m.user.findMany.mockResolvedValue([]); m.user.create.mockResolvedValue(patient); m.hash.mockResolvedValue('internal-unusable-password')
-  m.transaction.mockImplementation(async fn => fn({ user: m.user, doctorPatient: m.relation, auditLog: { create: m.audit } }))
+  m.transaction.mockImplementation(async fn => fn({ identityReview: { create: m.review }, user: m.user, doctorPatient: m.relation, auditLog: { create: m.audit } }))
 })
 it('search is scoped to the staff doctor and excludes passwords, clinical fields and other clinic records', async () => {
   m.user.findMany.mockResolvedValue([patient]); const r = await call({ intent: 'search', fullName: 'Paciente' })
@@ -33,10 +33,11 @@ it('new assisted record stores birth and employee attestation without activating
   expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: 'employee', entityId: patient.id, metadata: expect.objectContaining({ doctorId: 'doctor', actorRole: 'STAFF', authorization: expect.objectContaining({ confirmed: true }), personalAccessActivated: false }) }) })
   expect(m.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' })
 })
-it('repeat name and birth in the authorized clinic reuses the record without creating another account or relationship', async () => {
-  m.user.findFirst.mockResolvedValue(patient); const r = await call(body)
-  expect(r.status).toHaveBeenCalledWith(200); expect(r.json).toHaveBeenCalledWith({ success: true, patient, existing: true })
-  expect(m.user.create).not.toHaveBeenCalled(); expect(m.relation.create).not.toHaveBeenCalled()
+it('same clinic name and birth is reviewed rather than automatically treating two people as the same patient', async () => {
+  m.user.findMany.mockResolvedValue([{ ...patient, contactPhone: null }]); const r = await call(body)
+  expect(r.status).toHaveBeenCalledWith(202)
+  expect(m.review).toHaveBeenCalled()
+  expect(m.relation.create).not.toHaveBeenCalled()
 })
 it('an existing email never lets staff bypass consent or recreate revoked access', async () => {
   m.user.findUnique.mockResolvedValue({ ...patient, role: 'PATIENT', active: true }); m.relation.findUnique.mockResolvedValue(null)
@@ -54,4 +55,15 @@ it('a concurrent email registration cannot grant access to the newly existing ac
 it('staff cannot search or create while the doctor license is inactive', async () => {
   m.license.mockResolvedValue({ active: false }); const r = await call({ intent: 'search', fullName: 'Paciente' })
   expect(r.status).toHaveBeenCalledWith(403); expect(m.user.findMany).not.toHaveBeenCalled()
+})
+
+it('global match at another clinic creates a held record and Admin review without disclosing candidates or granting clinic access', async () => {
+  m.user.findMany.mockResolvedValue([{ id: 'other-clinic', fullName: patient.fullName, contactPhone: null }])
+  const r = await call(body)
+  expect(r.status).toHaveBeenCalledWith(202)
+  expect(r.json).toHaveBeenCalledWith(expect.objectContaining({ held: true }))
+  expect(JSON.stringify(r.json.mock.calls)).not.toContain('other-clinic')
+  expect(m.user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ active: false, identityStatus: 'HOLD' }) }))
+  expect(m.review).toHaveBeenCalledWith({ data: { userId: patient.id, candidateIds: ['other-clinic'], doctorId: 'doctor' } })
+  expect(m.relation.create).not.toHaveBeenCalled()
 })

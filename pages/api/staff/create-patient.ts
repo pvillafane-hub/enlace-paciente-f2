@@ -1,3 +1,5 @@
+import { identityCandidates } from '@/lib/identity-registration'
+import { normalizedPhone, IDENTITY_HOLD_MESSAGE } from '@/lib/identity-policy'
 import { getLicenseAccess } from '@/lib/license-access'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -18,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!(await getLicenseAccess(session.userId)).active) return res.status(403).json({ error: 'Necesitas una licencia activa para esta acción', code: 'LICENSE_REQUIRED' })
     const doctorId = await clinicDoctorId(session.user)
     if (!doctorId) return res.status(403).json({ error: 'No autorizado' })
-    const { fullName, email, dateOfBirth, authorizationConfirmed, intent } = req.body ?? {}
+    const { fullName, email, dateOfBirth, authorizationConfirmed, intent, contactPhone } = req.body ?? {}
     const name = typeof fullName === 'string' ? fullName.trim().replace(/\s+/g, ' ') : ''
     if (name.length < 2 || name.length > 200) return res.status(400).json({ error: 'Escribe el nombre completo del paciente.' })
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Puerto_Rico', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -46,18 +48,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (existing.dateOfBirth && existing.dateOfBirth.toISOString().slice(0, 10) !== dateOfBirth) return res.status(409).json({ error: 'La fecha de nacimiento no coincide con el expediente autorizado. Verifica la identidad antes de continuar.' })
       return res.status(200).json({ success: true, existing: true, patient: { id: existing.id, fullName: existing.fullName, dateOfBirth: existing.dateOfBirth } })
     }
+    const phone = normalizedPhone(typeof contactPhone === 'string' ? contactPhone : '')
+    if (phone && !/^[0-9]{10,15}$/.test(phone)) return res.status(400).json({ error: 'Verifica el teléfono de contacto.' })
     const passwordHash = await hashPassword(randomBytes(32).toString('base64url'))
     const result = await prisma.$transaction(async tx => {
-      // Serializable lookup also prevents repeated submissions from creating duplicate clinic records.
-      const duplicate = await tx.user.findFirst({ where: { role: 'PATIENT', active: true, fullName: { equals: name, mode: 'insensitive' }, dateOfBirth: new Date(dateOfBirth), patientDoctors: { some: { doctorId } } }, select: patientSelect })
-      if (duplicate) return { patient: duplicate, existing: true }
       // Recheck the optional email inside the transaction, so a concurrent registration never grants access to an existing account.
       if (cleanEmail && await tx.user.findUnique({ where: { email: cleanEmail }, select: { id: true } })) throw new RegistrationError('El correo ya está registrado. Busca el expediente o solicita acceso desde la cuenta del doctor.')
-      const user = await tx.user.create({ data: { fullName: name, dateOfBirth: new Date(dateOfBirth), email: cleanEmail || `patient-${randomUUID()}@enlacesalud.local`, passwordHash, role: 'PATIENT' }, select: patientSelect })
+      const candidateIds = await identityCandidates(tx, name, new Date(dateOfBirth), phone || null)
+      const held = candidateIds.length > 0
+      const user = await tx.user.create({ data: { contactPhone: phone || null, identityStatus: held ? 'HOLD' : 'CLEAR', active: !held, fullName: name, dateOfBirth: new Date(dateOfBirth), email: cleanEmail || `patient-${randomUUID()}@enlacesalud.local`, passwordHash, role: 'PATIENT' }, select: patientSelect })
+      if (held) {
+        await tx.identityReview.create({ data: { userId: user.id, candidateIds, doctorId } })
+        await tx.auditLog.create({ data: { userId: session.userId, action: 'IDENTITY_REVIEW_REQUESTED', entityId: user.id, metadata: { source: 'assisted_registration', candidateCount: candidateIds.length } } })
+        return { held: true }
+      }
       await tx.doctorPatient.create({ data: { doctorId, patientId: user.id } })
       await tx.auditLog.create({ data: { userId: session.userId, action: 'PATIENT_CREATED', entityId: user.id, metadata: { source: 'assisted_registration', doctorId, actorRole: session.user.role, authorization: { confirmed: true, method: 'staff_or_doctor_attestation', recordedAt: new Date().toISOString() }, personalAccessActivated: false } } })
       return { patient: user, existing: false }
     }, { isolationLevel: 'Serializable' })
+    if ('held' in result) return res.status(202).json({ held: true, message: IDENTITY_HOLD_MESSAGE })
     return res.status(result.existing ? 200 : 201).json({ success: true, ...result })
   } catch (error) {
     console.error('PATIENT_CREATE_FAILED')

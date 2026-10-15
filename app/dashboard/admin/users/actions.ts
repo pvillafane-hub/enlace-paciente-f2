@@ -16,7 +16,7 @@ async function requireAdmin() {
 
 async function target(tx: Prisma.TransactionClient, userId: string) {
   const user = await tx.user.findUnique({ where: { id: userId } })
-  if (!user || user.role === Role.ADMIN) throw new Error('Usuario no disponible para esta acción')
+  if (!user || user.identityStatus !== 'CLEAR' || user.role === Role.ADMIN) throw new Error('Usuario no disponible para esta acción')
   const assignments = await tx.clinicStaff.findMany({
     where: { staffId: userId, active: true }, select: { doctorId: true }, orderBy: { doctorId: 'asc' },
   })

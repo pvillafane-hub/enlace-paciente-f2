@@ -7,6 +7,8 @@ type Patient = { id: string; fullName: string; dateOfBirth: string | null }
 export default function ActivatePatientBox({ enabled = true }: { enabled?: boolean }) {
   const [fullName, setFullName] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [holdMessage, setHoldMessage] = useState('')
   const [email, setEmail] = useState('')
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,17 +29,18 @@ export default function ActivatePatientBox({ enabled = true }: { enabled?: boole
     try {
       const response = await fetch('/api/staff/create-patient', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ intent: stage === 'search' ? 'search' : 'register', fullName, dateOfBirth, email, authorizationConfirmed: authorized }),
+        body: JSON.stringify({ intent: stage === 'search' ? 'search' : 'register', fullName, dateOfBirth, email, contactPhone, authorizationConfirmed: authorized }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'No se pudo completar la acción. Intenta nuevamente.')
+      if (data.held) { setHoldMessage(data.message); setStage('done'); return }
       if (stage === 'search') { setMatches(data.patients); setHasMore(data.hasMore) }
       else { setSelected(data.patient); setExisting(data.existing); setStage('done') }
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo completar la acción.') }
     finally { setLoading(false) }
   }
   function reset() {
-    setFullName(''); setDateOfBirth(''); setEmail(''); setAuthorized(false)
+    setContactPhone(''); setHoldMessage(''); setFullName(''); setDateOfBirth(''); setEmail(''); setAuthorized(false)
     setMatches(null); setSelected(null); setHasMore(false); setStage('search'); setError('')
   }
   return <section aria-labelledby="assisted-patient-title" className="rounded-2xl border bg-white p-6 shadow-sm space-y-5">
@@ -54,6 +57,7 @@ export default function ActivatePatientBox({ enabled = true }: { enabled?: boole
           <input type="date" value={dateOfBirth} onChange={e => { setDateOfBirth(e.target.value); setMatches(null) }} min="1850-01-01" max={today} required={stage === 'register'} className="mt-2 block w-full rounded-xl border border-gray-400 px-4 py-3 text-lg" />
         </label>
         {stage === 'register' && <>
+          <label className="block font-medium">Teléfono del paciente o padre/tutor (opcional)<input type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} className="mt-2 block w-full rounded-xl border px-4 py-3 text-lg" /></label>
           <label className="block font-medium">Correo del paciente <span className="font-normal">(opcional)</span>
             <input type="email" autoComplete="off" value={email} onChange={e => setEmail(e.target.value)} maxLength={254} aria-describedby="assisted-email-help" className="mt-2 block w-full rounded-xl border border-gray-400 px-4 py-3 text-lg" />
           </label>
@@ -79,6 +83,7 @@ export default function ActivatePatientBox({ enabled = true }: { enabled?: boole
       {hasMore && <p>Hay más coincidencias. Añade la fecha de nacimiento o un nombre más completo para afinar la búsqueda.</p>}
       <button type="button" disabled={!enabled || loading} onClick={() => { setStage('register'); setError('') }} className="min-h-12 rounded-xl border px-5 py-3 text-lg">{matches.length ? 'No es ninguno · Registrar nuevo paciente' : 'Registrar nuevo paciente'}</button>
     </div>}
+    {holdMessage && <div role="status" className="rounded-xl bg-amber-50 p-5"><p>{holdMessage}</p><p>Admin recibió una revisión pendiente. No cargues documentos ni crees otra cuenta.</p><button type="button" onClick={reset} className="min-h-12 underline">Atender otro paciente</button></div>}
     {stage === 'done' && selected && <div className="space-y-4">
       <div role="status" className="rounded-xl border border-green-300 bg-green-50 p-5 text-green-950">
         <p className="font-semibold text-lg">{existing ? 'Expediente existente seleccionado' : 'Paciente registrado'}</p>

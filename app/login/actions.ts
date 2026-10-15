@@ -25,19 +25,15 @@ export async function login(
     return { error: 'Email o contraseña incorrectos.' }
   }
 
-  // 🔥 NUEVO: BLOQUEO POR USUARIO INACTIVO
-  if (!user.active) {
-    return {
-      error: 'Tu cuenta ha sido desactivada. Contacta al administrador.'
-    }
-  }
-
   const ok = await verifyPassword(password, user.passwordHash)
 
   if (!ok) {
     return { error: 'Email o contraseña incorrectos.' }
   }
 
+  if (user.identityStatus !== 'CLEAR') return { error: 'Necesitamos validar tu identidad para completar el registro. Contacta al administrador.' }
+
+  if (!user.active) return { error: 'Tu cuenta está desactivada. Contacta al administrador.' }
   await setSession(user.id)
 
   await auditLog({

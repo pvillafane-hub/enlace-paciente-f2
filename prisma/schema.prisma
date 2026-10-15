@@ -30,6 +30,9 @@ model Session {
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
+  contactPhone String?
+  identityStatus String @default("CLEAR")
+  identityReview IdentityReview?
   passwordHash String
   fullName     String
   role         Role     @default(PATIENT)
@@ -276,5 +279,19 @@ model GuardianLink {
   patient User @relation("Representatives", fields: [patientId], references: [id])
   @@unique([guardianId, patientId])
   @@index([guardianId, status, validUntil])
+  @@index([status, createdAt])
+}
+
+model IdentityReview {
+  id String @id @default(cuid())
+  userId String @unique
+  user User @relation(fields: [userId], references: [id])
+  candidateIds String[]
+  doctorId String?
+  status String @default("PENDING")
+  reason String?
+  reviewedById String?
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
   @@index([status, createdAt])
 }

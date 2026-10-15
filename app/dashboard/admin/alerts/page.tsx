@@ -42,6 +42,8 @@ export default async function AdminAlertsPage() {
     redirect("/dashboard")
   }
 
+  const identityCount = await prisma.identityReview.count({ where: { status: 'PENDING' } })
+
   // 🕒 Últimas 24 horas
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
@@ -93,6 +95,7 @@ export default async function AdminAlertsPage() {
 
   return (
     <div className="space-y-6">
+      {identityCount > 0 && <a href="/dashboard/admin/identity" className="block rounded-xl bg-amber-100 p-4">{identityCount} registros requieren verificación de identidad. Revisar.</a>}
 
       <h1 className="text-2xl font-bold">
         🚨 Centro de Alertas

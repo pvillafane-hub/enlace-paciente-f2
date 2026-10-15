@@ -8,7 +8,7 @@ if (process.env.VERCEL) {
   }
   const client = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL_UNPOOLED } } });
   try {
-    const rows = await client.$queryRaw`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='GuardianLink') AS links, EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Document' AND column_name='proxyVisible') AS documents, EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE migration_name='20261013160000_guardian_links' AND finished_at IS NOT NULL AND rolled_back_at IS NULL) AS applied`;
+    const rows = await client.$queryRaw`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='GuardianLink') AS links, EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Document' AND column_name='proxyVisible') AS documents, EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE migration_name='20261015150000_identity_review' AND finished_at IS NOT NULL AND rolled_back_at IS NULL) AS applied`;
     if (!rows[0]?.links || !rows[0]?.documents || !rows[0]?.applied) {
       execFileSync(process.execPath, ['scripts/migrate-isolated.mjs'], { stdio: 'pipe' });
       console.log('GUARDIAN_ADDITIVE_MIGRATION_APPLIED');

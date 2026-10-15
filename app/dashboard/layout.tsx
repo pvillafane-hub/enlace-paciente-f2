@@ -46,10 +46,13 @@ export default async function DashboardLayout({
     catch { alertSummary = { alerts: [], total: 0, status: 'error' } }
   }
 
+  const identityCount = isAdmin ? await prisma.identityReview.count({ where: { status: 'PENDING' } }) : 0
+
   return (
 
     <div className="min-h-screen bg-gray-50">
 
+      {isAdmin && identityCount > 0 && <Link href="/dashboard/admin/identity" role="status" className="block bg-amber-100 p-4 text-center font-semibold text-amber-950">{identityCount} registros pendientes de verificación de identidad · Revisar</Link>}
       <nav className="bg-white border-b">
 
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -116,6 +119,7 @@ export default async function DashboardLayout({
                 </Link>
 
                 <Link href="/dashboard/admin/licenses">Licencias</Link>
+                <Link href="/dashboard/admin/identity">Verificar identidad</Link>
                 <Link href="/dashboard/admin/guardians">Padres y tutores</Link>
 
                 <Link href="/dashboard/admin/logs">

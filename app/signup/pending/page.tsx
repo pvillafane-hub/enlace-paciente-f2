@@ -1,0 +1,2 @@
+import Link from 'next/link'
+export default function PendingIdentity() { return <main className="mx-auto max-w-lg p-6 space-y-5"><h1 className="text-3xl font-bold">Verificación de identidad pendiente</h1><p className="text-lg">Necesitamos validar tu identidad para completar el registro. Nuestro equipo se comunicará contigo.</p><p>No necesitas crear otra cuenta. Por ahora no puedes cargar documentos ni acceder a expedientes.</p><Link href="/login" className="block min-h-12 rounded-xl bg-blue-700 p-4 text-white">Volver al acceso</Link></main> }
