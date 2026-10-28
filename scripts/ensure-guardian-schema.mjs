@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 // Local compilation does not mutate a database. Only this named isolated project may run the additive release migration.
 if (process.env.VERCEL) {
-  if (process.env.VERCEL_PROJECT_ID !== 'prj_E14yVB1Az8RWvAmpkQ9hO0Z1ESJC' || process.env.ENLACE_ISOLATED_ENVIRONMENT !== 'true' || !process.env.DATABASE_URL_UNPOOLED) {
+  if (!['prj_E14yVB1Az8RWvAmpkQ9hO0Z1ESJC', 'prj_OZQyTup16aGA8sz9gEIWt17uBTVv'].includes(process.env.VERCEL_PROJECT_ID) || process.env.ENLACE_ISOLATED_ENVIRONMENT !== 'true' || !process.env.DATABASE_URL_UNPOOLED) {
     console.error('GUARDIAN_MIGRATION_BLOCKED: isolated mejoras project and direct database connection required');
     process.exit(1);
   }
