@@ -118,3 +118,19 @@ Fuentes de diseño:
 - https://hl7.org/fhir/R4/diagnosticreport.html
 - https://hl7.org/fhir/R4/observation.html
 - https://hl7.eu/refactored/msgORU_R01.html
+
+## Pantalla de administración
+
+Ruta `/dashboard/admin/interoperability`, accesible desde el menú de Admin tanto
+en computadora como en móvil. Solo admite administradores activos con sesión
+validada. Permite filtrar los últimos 50 recibos por identificación y consultar
+hasta 5 eventos recientes de cada recibo, incluidos reenvíos y conflictos. No
+expone tokens, no ejecuta aprobaciones y no entrega documentos al expediente.
+
+En producción o sin aislamiento muestra el módulo deshabilitado sin consultar
+las tablas nuevas. Con configuración incompleta indica que falta preparar el
+entorno. Diferencia una bandeja vacía de una base de datos no disponible.
+
+Para verlo en la aplicación habitual hace falta integrar esta rama en la rama
+que alimenta ese despliegue. El trabajo está en la rama de fase 3; no se ha
+activado la recepción ni migrado la base clínica.

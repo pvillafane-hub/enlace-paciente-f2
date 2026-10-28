@@ -66,7 +66,7 @@ export default async function DashboardLayout({
           </Link>
 
           {/* 🔥 DESKTOP MENU */}
-          <div className="hidden lg:flex items-center gap-4 text-base">
+          <div className="hidden lg:flex flex-wrap justify-end items-center gap-x-4 gap-y-2 text-base">
 
             {!isAdmin && (
               <Link href="/dashboard">
@@ -121,6 +121,7 @@ export default async function DashboardLayout({
                 <Link href="/dashboard/admin/licenses">Licencias</Link>
                 <Link href="/dashboard/admin/identity">Verificar identidad</Link>
                 <Link href="/dashboard/admin/guardians">Padres y tutores</Link>
+                <Link href="/dashboard/admin/interoperability">Interoperabilidad</Link>
 
                 <Link href="/dashboard/admin/logs">
                   Logs
