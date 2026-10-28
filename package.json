@@ -22,7 +22,7 @@
     "browser-image-compression": "^2.0.2",
     "formidable": "^3.5.4",
     "html5-qrcode": "^2.3.8",
-    "next": "^16.4.0",
+    "next": "16.4.3",
     "pdf-parse": "^2.4.5",
     "prisma": "^5.22.0",
     "qrcode.react": "^4.2.0",
@@ -40,12 +40,17 @@
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.16",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.0",
+    "eslint-config-next": "16.4.3",
     "postcss": "^8.5.29",
     "typescript": "^5",
     "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22.13.0"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
   }
 }
