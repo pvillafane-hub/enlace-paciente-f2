@@ -1,0 +1,15 @@
+{
+  "reportId": "TEST-REPORT-001",
+  "patientId": "TEST-PATIENT-001",
+  "birthDate": "2018-04-12",
+  "testCode": "58410-2",
+  "issued": "2026-10-28T12:00:00Z",
+  "status": "final",
+  "observations": [
+    {
+      "code": "718-7",
+      "value": "12.4",
+      "unit": "g/dL"
+    }
+  ]
+}

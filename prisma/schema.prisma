@@ -295,3 +295,26 @@ model IdentityReview {
   reviewedAt DateTime?
   @@index([status, createdAt])
 }
+
+// Synthetic integration receipts only. No relation to clinical User or Document.
+model InteropSandboxReceipt {
+  id          String   @id @default(uuid())
+  source      String
+  reportId    String
+  fingerprint String
+  format      String
+  status      String
+  normalized  Json
+  createdAt   DateTime @default(now())
+  events      InteropSandboxEvent[]
+  @@unique([source, reportId])
+}
+
+model InteropSandboxEvent {
+  id        String @id @default(uuid())
+  receiptId String
+  action    String
+  createdAt DateTime @default(now())
+  receipt   InteropSandboxReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  @@index([receiptId, createdAt])
+}

@@ -1,0 +1,73 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:test-patient",
+      "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+          {
+            "system": "urn:enlace:synthetic",
+            "value": "TEST-PATIENT-001"
+          }
+        ],
+        "birthDate": "2018-04-12"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:test-report",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "identifier": [
+          {
+            "system": "urn:enlace:synthetic:reports",
+            "value": "TEST-REPORT-001"
+          }
+        ],
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "58410-2"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:test-patient"
+        },
+        "issued": "2026-10-28T12:00:00Z",
+        "result": [
+          {
+            "reference": "urn:uuid:test-observation"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:test-observation",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:test-patient"
+        },
+        "valueQuantity": {
+          "value": 12.4,
+          "unit": "g/dL",
+          "code": "g/dL",
+          "system": "http://unitsofmeasure.org"
+        }
+      }
+    }
+  ]
+}
