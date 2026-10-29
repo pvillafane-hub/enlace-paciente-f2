@@ -1,10 +1,13 @@
 import Link from 'next/link'
+import ReviewForm from './ReviewForm'
 import { requireActiveAdmin } from '@/lib/admin-session'
 import { adminInteropReceipts, interopFilter, safeResultSummary } from '@/lib/interop/admin-view'
 
 export const dynamic = 'force-dynamic'
-const labels = { ALL: 'Todos', MATCHED: 'Identificados', PENDING_REVIEW: 'Pendientes de identificación' }
+const labels = { ALL: 'Todos', MATCHED: 'Identificados', PENDING_REVIEW: 'Pendientes de identificación', MANUALLY_MATCHED: 'Confirmados manualmente', REJECTED: 'Rechazados' }
 const actions: Record<string, string> = {
+  IDENTITY_CONFIRMED_MANUALLY: 'Identidad ficticia confirmada por administrador',
+  IDENTITY_REJECTED: 'Identificación rechazada por administrador',
   RECEIVED_MATCHED: 'Recibido e identificado en pruebas',
   RECEIVED_PENDING_REVIEW: 'Recibido; identidad pendiente',
   DUPLICATE_RECEIVED: 'Reenvío idéntico reconocido',
@@ -29,15 +32,16 @@ export default async function InteroperabilityPage({ searchParams }: { searchPar
       {model.state === 'ready' && <><p className="text-gray-600">Mostrando los últimos {model.receipts.length} recibos del filtro seleccionado, hasta un máximo de 50. Los reenvíos aparecen dentro del recibo original.</p>
         {model.receipts.length === 0 && <p className="rounded-xl border border-dashed p-6">No hay recibos para este filtro. Envía un resultado ficticio desde el entorno de integración para comenzar.</p>}
         {model.receipts.map(row => { const summary = safeResultSummary(row.normalized); return <article key={row.id} className="min-w-0 space-y-4 rounded-xl border bg-white p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3"><h3 className="break-all text-xl font-semibold">{row.reportId}</h3><span className={`rounded-full px-3 py-2 font-semibold ${row.status === 'MATCHED' ? 'bg-green-100 text-green-950' : 'bg-amber-100 text-amber-950'}`}>{row.status === 'MATCHED' ? 'Identificado en pruebas' : 'Pendiente de identificación'}</span></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><h3 className="break-all text-xl font-semibold">{row.reportId}</h3><span className={`rounded-full px-3 py-2 font-semibold ${['MATCHED', 'MANUALLY_MATCHED'].includes(row.status) ? 'bg-green-100 text-green-950' : 'bg-amber-100 text-amber-950'}`}>{row.status === 'MATCHED' ? 'Identificado en pruebas' : row.status === 'MANUALLY_MATCHED' ? 'Confirmado manualmente en pruebas' : row.status === 'REJECTED' ? 'Identificación rechazada' : 'Pendiente de identificación'}</span></div>
           <p className="break-words text-gray-600">Fuente: {row.source} · Formato: {row.format} · Recibido: {date(row.createdAt)} (Puerto Rico)</p>
           {summary && <dl className="grid gap-4 sm:grid-cols-2"><div><dt className="font-semibold">Paciente ficticio</dt><dd className="break-all">{summary.patientId}</dd></div><div><dt className="font-semibold">Fecha de nacimiento</dt><dd>{summary.birthDate}</dd></div><div><dt className="font-semibold">Código de prueba</dt><dd className="break-all">{summary.testCode}</dd></div><div><dt className="font-semibold">Emisión del laboratorio</dt><dd className="break-all">{summary.issued}</dd></div></dl>}
           {summary && summary.observations.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver valores del resultado ficticio</summary><ul className="space-y-3 border-t pt-3">{summary.observations.map((observation, index) => <li key={index} className="flex flex-wrap justify-between gap-3 rounded-lg bg-gray-50 p-3"><span className="break-all">Código: {observation.code}</span><span className="break-all font-semibold">{observation.value} {observation.unit}</span></li>)}</ul></details>}
-          {row.status === 'PENDING_REVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">El identificador o la fecha de nacimiento no coincide con el paciente ficticio configurado. Este resultado no se asignó a un expediente. La aprobación manual se incorporará en una etapa posterior.</p>}
-          <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver últimos eventos de recepción</summary><ul className="space-y-2 border-t pt-3">{row.events.map(event => <li key={event.id}>{actions[event.action] || 'Evento de recepción'} · {date(event.createdAt)} (Puerto Rico)</li>)}</ul><p className="mt-3 break-all text-sm text-gray-600">ID del recibo: {row.id}. Se muestran hasta 5 eventos recientes.</p></details>
+          {row.status === 'PENDING_REVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">El identificador o la fecha de nacimiento no coincide con el paciente ficticio configurado. Este resultado no se asignó a un expediente. Revisa la discrepancia antes de registrar una decisión.</p>}
+          {row.status === 'PENDING_REVIEW' && <ReviewForm id={row.id} />}
+          <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver últimos eventos de recepción</summary><ul className="space-y-2 border-t pt-3">{row.events.map(event => <li key={event.id}>{actions[event.action] || 'Evento de recepción'} · {date(event.createdAt)} (Puerto Rico){event.actorId && <p className="break-all">Administrador: {event.actorId}</p>}{event.reason && <p className="whitespace-pre-wrap break-words">Motivo: {event.reason}</p>}{event.patientId && <p>Identidad confirmada: {event.patientId}</p>}</li>)}</ul><p className="mt-3 break-all text-sm text-gray-600">ID del recibo: {row.id}. Se muestran hasta 5 eventos recientes.</p></details>
         </article> })}
       </>}
     </section>
-    <section className="rounded-xl bg-blue-50 p-5"><h2 className="text-xl font-semibold">Cómo validar esta etapa</h2><ol className="mt-3 list-decimal space-y-2 pl-6"><li>Preparar una base PostgreSQL aislada y aplicar las tablas de pruebas.</li><li>Enviar los ejemplos ficticios de API JSON, FHIR y HL7.</li><li>Revisar aquí los recibos identificados y pendientes, además de los reenvíos y conflictos.</li><li>Reiniciar el entorno y comprobar que los recibos permanecen disponibles.</li></ol><p className="mt-3 text-gray-700">Esta pantalla es de consulta. Todavía no incorpora aprobación de identidad ni entrega al expediente clínico.</p></section>
+    <section className="rounded-xl bg-blue-50 p-5"><h2 className="text-xl font-semibold">Cómo validar esta etapa</h2><ol className="mt-3 list-decimal space-y-2 pl-6"><li>Preparar una base PostgreSQL aislada y aplicar las tablas de pruebas.</li><li>Enviar los ejemplos ficticios de API JSON, FHIR y HL7.</li><li>Revisar aquí los recibos identificados y pendientes, además de los reenvíos y conflictos.</li><li>Reiniciar el entorno y comprobar que los recibos permanecen disponibles.</li></ol><p className="mt-3 text-gray-700">Los administradores pueden confirmar o rechazar la identificación ficticia pendiente con un motivo obligatorio. Se conserva el mensaje original y el historial. No hay entrega al expediente clínico.</p></section>
   </section>
 }

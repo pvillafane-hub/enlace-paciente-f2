@@ -2,6 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ admin: vi.fn(), list: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/admin-session', () => ({ requireActiveAdmin: m.admin }))
 vi.mock('@/lib/prisma', () => ({ prisma: { interopSandboxReceipt: { findMany: m.list } } }))
 import { adminInteropReceipts, interopFilter, safeResultSummary } from '../src/lib/interop/admin-view'
@@ -40,11 +41,11 @@ it('separates an empty inbox from storage failure without leaking diagnostics', 
   const failed = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }))
   expect(failed).toContain('Bandeja temporalmente no disponible'); expect(failed).not.toContain('database-password-detail'); expect(failed).not.toContain('No hay recibos')
 })
-it('renders pending identities and retry/conflict events as text without approval actions', async () => {
+it('renders pending identities and retry/conflict events as text with guarded review actions', async () => {
   m.list.mockResolvedValue([{ id: 'r1', source: 'TEST-LAB', reportId: '<script>alert(1)</script>', status: 'PENDING_REVIEW', format: 'fhir-r4', createdAt: new Date('2026-10-28T12:00:00Z'), normalized: { patientId: 'TEST-UNKNOWN', birthDate: '2018-04-13', testCode: '718-7', issued: '2026-10-28T12:00:00Z' }, events: [{ id: 'e1', action: 'CONFLICT_REJECTED', createdAt: new Date() }, { id: 'e2', action: 'DUPLICATE_RECEIVED', createdAt: new Date() }] }])
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ status: 'PENDING_REVIEW' }) }))
   expect(html).toContain('TEST-UNKNOWN'); expect(html).toContain('Reenvío con cambios rechazado'); expect(html).toContain('Reenvío idéntico reconocido')
-  expect(html).not.toContain('<script>'); expect(html).not.toContain('<form'); expect(html).not.toContain('a'.repeat(40))
+  expect(html).not.toContain('<script>alert(1)</script>'); expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;'); expect(html).toContain('<form'); expect(html).not.toContain('a'.repeat(40))
   expect(html).toContain('no se asignó a un expediente')
 })
 it('handles unexpected stored JSON without rendering arbitrary structures', () => {

@@ -134,3 +134,9 @@ entorno. Diferencia una bandeja vacía de una base de datos no disponible.
 Para verlo en la aplicación habitual hace falta integrar esta rama en la rama
 que alimenta ese despliegue. El trabajo está en la rama de fase 3; no se ha
 activado la recepción ni migrado la base clínica.
+
+## Manual synthetic identity review
+
+Active admins in the isolated Preview can confirm TEST-PATIENT-001 (2018-04-12) or reject a pending identity. A 10–1000 character reason, explicit confirmation, and a synthetic target on confirmation are required. Decisions transition PENDING_REVIEW to MANUALLY_MATCHED or REJECTED. Status and event (admin ID, timestamp, reason and confirmed target) commit atomically; conditional updates prevent a second decision. Normalized input and fingerprint are unchanged. Retries retain the reviewed status. No User/Document association or clinical delivery is performed. Production remains disabled.
+
+Apply migration 202610290001_interop_review before deploying this version. The synthetic Neon database received the source SQL transactionally and its source checksum was recorded in _prisma_migrations.

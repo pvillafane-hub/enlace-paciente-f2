@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma'
 
-export const interopStatuses = ['ALL', 'MATCHED', 'PENDING_REVIEW'] as const
+export const interopStatuses = ['ALL', 'MATCHED', 'PENDING_REVIEW', 'MANUALLY_MATCHED', 'REJECTED'] as const
 export type InteropFilter = typeof interopStatuses[number]
 export function interopFilter(value: unknown): InteropFilter {
-  return value === 'MATCHED' || value === 'PENDING_REVIEW' ? value : 'ALL'
+  return interopStatuses.includes(value as InteropFilter) ? value as InteropFilter : 'ALL'
 }
 export function sandboxState() {
   if (process.env.INTEROP_SANDBOX_ENABLED !== 'true' || process.env.ENLACE_ISOLATED_ENVIRONMENT !== 'true' || process.env.VERCEL_ENV === 'production') return 'disabled' as const
@@ -18,7 +18,7 @@ export async function adminInteropReceipts(filter: InteropFilter) {
     const receipts = await prisma.interopSandboxReceipt.findMany({
       where: { source: process.env.INTEROP_SANDBOX_SOURCE!, ...(filter === 'ALL' ? {} : { status: filter }) },
       select: { id: true, source: true, reportId: true, status: true, format: true, normalized: true, createdAt: true,
-        events: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 5, select: { id: true, action: true, createdAt: true } } },
+        events: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 5, select: { id: true, action: true, actorId: true, reason: true, patientId: true, createdAt: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50,
     })
     return { state: 'ready' as const, receipts }

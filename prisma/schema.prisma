@@ -314,6 +314,9 @@ model InteropSandboxEvent {
   id        String @id @default(uuid())
   receiptId String
   action    String
+  actorId   String?
+  reason    String?
+  patientId String?
   createdAt DateTime @default(now())
   receipt   InteropSandboxReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   @@index([receiptId, createdAt])
