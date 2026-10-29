@@ -40,6 +40,7 @@ model User {
   createdAt    DateTime @default(now())
 
   guardianLinks GuardianLink[] @relation("GuardianLinks")
+  interopBindings InteropSandboxPatient[]
   representatives GuardianLink[] @relation("Representatives")
   qrTokens PatientQRToken[]  // 🔥 relación QR
 
@@ -106,6 +107,7 @@ model Document {
 
   user   User        @relation(fields: [userId], references: [id])
   shares ShareLink[]
+  interopReceipt InteropSandboxReceipt?
   @@index([userId, deletedAt, createdAt])
 }
 
@@ -305,9 +307,23 @@ model InteropSandboxReceipt {
   format      String
   status      String
   normalized  Json
+  deliveredDocumentId String? @unique
+  deliveredAt DateTime?
+  deliveryDocument Document? @relation(fields: [deliveredDocumentId], references: [id])
   createdAt   DateTime @default(now())
   events      InteropSandboxEvent[]
   @@unique([source, reportId])
+}
+
+model InteropSandboxPatient {
+  id String @id @default(uuid())
+  source String
+  externalPatientId String
+  userId String
+  createdById String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+  @@unique([source, externalPatientId])
 }
 
 model InteropSandboxEvent {

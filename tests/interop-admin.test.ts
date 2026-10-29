@@ -1,7 +1,8 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, expect, it, vi } from 'vitest'
-const m = vi.hoisted(() => ({ admin: vi.fn(), list: vi.fn() }))
+const m = vi.hoisted(() => ({ admin: vi.fn(), list: vi.fn(), delivery: vi.fn() }))
+vi.mock('@/lib/interop/delivery', () => ({ deliveryModel: m.delivery }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/admin-session', () => ({ requireActiveAdmin: m.admin }))
 vi.mock('@/lib/prisma', () => ({ prisma: { interopSandboxReceipt: { findMany: m.list } } }))
@@ -9,7 +10,7 @@ import { adminInteropReceipts, interopFilter, safeResultSummary } from '../src/l
 import Page from '../app/dashboard/admin/interoperability/page'
 beforeEach(() => {
   vi.stubGlobal('React', React)
-  vi.resetAllMocks(); m.admin.mockResolvedValue({ id: 'admin' }); m.list.mockResolvedValue([])
+  vi.resetAllMocks(); m.delivery.mockResolvedValue({ binding: null, candidates: [] }); m.admin.mockResolvedValue({ id: 'admin' }); m.list.mockResolvedValue([])
   vi.stubEnv('INTEROP_SANDBOX_ENABLED', 'true'); vi.stubEnv('ENLACE_ISOLATED_ENVIRONMENT', 'true'); vi.stubEnv('VERCEL_ENV', 'preview')
   vi.stubEnv('INTEROP_SANDBOX_TOKEN', 'a'.repeat(40)); vi.stubEnv('INTEROP_SANDBOX_SOURCE', 'TEST-LAB')
 })

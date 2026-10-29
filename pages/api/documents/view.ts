@@ -6,6 +6,7 @@ import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { readDocument } from '@/lib/document-storage'
 import { Readable } from 'node:stream'
+import { syntheticDocumentText } from '@/lib/interop/delivery'
 
 export default async function handler(
   req: NextApiRequest,
@@ -67,6 +68,15 @@ export default async function handler(
 
     if (!await canReadDocument(session.user, document)) return res.status(403).json({ error: 'Acceso denegado' })
 
+    if (document.filePath.startsWith('interop-sandbox:')) {
+      const report = await syntheticDocumentText(document)
+      if (!report) return res.status(404).json({ error: 'Resultado ficticio no disponible' })
+      await auditLog({ userId, action: 'DOCUMENT_VIEW', entityId: id })
+      res.setHeader('Cache-Control', 'private, no-store')
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      return res.status(200).send(report)
+    }
     const file = await readDocument(document.filePath)
     if (!file || file.statusCode !== 200) return res.status(404).json({ error: 'Documento no disponible' })
     await auditLog({ userId, action: 'DOCUMENT_VIEW', entityId: id })

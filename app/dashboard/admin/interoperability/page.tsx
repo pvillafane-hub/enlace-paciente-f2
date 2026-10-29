@@ -1,11 +1,14 @@
 import Link from 'next/link'
 import ReviewForm from './ReviewForm'
+import { BindingForm, DeliveryForm } from './DeliveryForm'
+import { deliveryModel } from '@/lib/interop/delivery'
 import { requireActiveAdmin } from '@/lib/admin-session'
 import { adminInteropReceipts, interopFilter, safeResultSummary } from '@/lib/interop/admin-view'
 
 export const dynamic = 'force-dynamic'
 const labels = { ALL: 'Todos', MATCHED: 'Identificados', PENDING_REVIEW: 'Pendientes de identificación', MANUALLY_MATCHED: 'Confirmados manualmente', REJECTED: 'Rechazados' }
 const actions: Record<string, string> = {
+  DELIVERED_TO_SYNTHETIC_RECORD: 'Resultado entregado al expediente ficticio',
   IDENTITY_CONFIRMED_MANUALLY: 'Identidad ficticia confirmada por administrador',
   IDENTITY_REJECTED: 'Identificación rechazada por administrador',
   RECEIVED_MATCHED: 'Recibido e identificado en pruebas',
@@ -18,16 +21,18 @@ export default async function InteroperabilityPage({ searchParams }: { searchPar
   await requireActiveAdmin(true)
   const filter = interopFilter((await searchParams).status)
   const model = await adminInteropReceipts(filter)
+  const delivery = model.state === 'ready' ? await deliveryModel().catch(() => null) : null
   return <section className="min-w-0 space-y-6" aria-labelledby="interop-title">
     <div className="flex flex-wrap items-center gap-3"><h1 id="interop-title" className="text-3xl font-bold">Interoperabilidad</h1><span className="rounded-full bg-indigo-100 px-3 py-2 font-semibold text-indigo-900">Fase 3 · Pruebas</span></div>
     <p className="text-lg text-gray-700">Recibe y consulta resultados ficticios de laboratorio por API JSON, FHIR R4 y un perfil limitado de HL7 v2.</p>
-    <aside className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950"><h2 className="text-xl font-semibold">Solo datos ficticios</h2><p className="mt-2">Los recibos permanecen separados del expediente clínico. Identificado significa que coincide con un paciente de prueba; no significa entregado al paciente ni al doctor.</p></aside>
+    <aside className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950"><h2 className="text-xl font-semibold">Solo datos ficticios</h2><p className="mt-2">Los recibos permanecen separados del expediente clínico. Identificado significa que coincide con un paciente de prueba; no significa entregado al paciente ni al doctor. La entrega se registra por separado y solo se habilita con una cuenta ficticia vinculada.</p></aside>
     <section className="rounded-xl border bg-white p-5" aria-labelledby="connection-title"><h2 id="connection-title" className="text-xl font-semibold">Estado del entorno</h2>
       <p role="status" className="mt-3 font-semibold">{model.state === 'ready' ? 'Entorno de pruebas habilitado' : model.state === 'disabled' ? 'Recepción de pruebas deshabilitada' : model.state === 'unconfigured' ? 'Configuración de pruebas incompleta' : 'Bandeja temporalmente no disponible'}</p>
       <p className="mt-2 text-gray-700">{model.state === 'ready' ? 'La bandeja consulta recibos de una fuente de pruebas. No hay una conexión con un laboratorio real validada.' : model.state === 'disabled' ? 'Para recibir mensajes se necesita un entorno aislado. La recepción no se habilita en producción.' : model.state === 'unconfigured' ? 'El responsable técnico debe completar la fuente y la credencial del entorno aislado.' : 'No se pudieron consultar los recibos. Verifica la base aislada y sus migraciones; después vuelve a intentar.'}</p>
       <dl className="mt-4 grid gap-4 sm:grid-cols-3">{[['API JSON', 'Resultados finales'], ['FHIR R4', 'Bundle de laboratorio limitado'], ['HL7 v2.5.1', 'ORU R01 de pruebas']].map(([title, detail]) => <div key={title}><dt className="font-semibold">{title}</dt><dd className="text-gray-600">{detail}</dd></div>)}</dl>
     </section>
-    <section aria-labelledby="inbox-title" className="space-y-4"><h2 id="inbox-title" className="text-2xl font-semibold">Bandeja de resultados de prueba</h2>
+    {model.state === 'ready' && <section className="space-y-4 rounded-xl border bg-white p-5"><h2 className="text-xl font-semibold">Destino del expediente ficticio</h2>{delivery?.binding ? <p>TEST-PATIENT-001 → {delivery.binding.user.fullName} · {delivery.binding.user.email}</p> : delivery ? <><p>Registra una cuenta de paciente con correo terminado en @example.test y nacimiento 2018-04-12. Activa su licencia desde Administración. Solo se admiten cuentas ficticias activas con identidad validada.</p>{delivery.candidates.length ? <BindingForm candidates={delivery.candidates} /> : <p className="font-semibold">Todavía no hay una cuenta ficticia elegible para vincular.</p>}</> : <p>No se pudo consultar la vinculación. Vuelve a cargar la página.</p>}</section>}
+    <section aria-labelledby="inbox-title"  className="space-y-4"><h2 id="inbox-title" className="text-2xl font-semibold">Bandeja de resultados de prueba</h2>
       <nav aria-label="Filtrar recibos" className="flex flex-wrap gap-3">{Object.entries(labels).map(([key, label]) => <Link key={key} href={`?status=${key}`} aria-current={filter === key ? 'page' : undefined} className={`inline-flex min-h-12 items-center rounded-xl border px-4 py-3 font-semibold ${filter === key ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 bg-white text-gray-800'}`}>{label}</Link>)}</nav>
       {model.state === 'ready' && <><p className="text-gray-600">Mostrando los últimos {model.receipts.length} recibos del filtro seleccionado, hasta un máximo de 50. Los reenvíos aparecen dentro del recibo original.</p>
         {model.receipts.length === 0 && <p className="rounded-xl border border-dashed p-6">No hay recibos para este filtro. Envía un resultado ficticio desde el entorno de integración para comenzar.</p>}
@@ -38,10 +43,11 @@ export default async function InteroperabilityPage({ searchParams }: { searchPar
           {summary && summary.observations.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver valores del resultado ficticio</summary><ul className="space-y-3 border-t pt-3">{summary.observations.map((observation, index) => <li key={index} className="flex flex-wrap justify-between gap-3 rounded-lg bg-gray-50 p-3"><span className="break-all">Código: {observation.code}</span><span className="break-all font-semibold">{observation.value} {observation.unit}</span></li>)}</ul></details>}
           {row.status === 'PENDING_REVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">El identificador o la fecha de nacimiento no coincide con el paciente ficticio configurado. Este resultado no se asignó a un expediente. Revisa la discrepancia antes de registrar una decisión.</p>}
           {row.status === 'PENDING_REVIEW' && <ReviewForm id={row.id} />}
+          {row.deliveredAt ? <p role="status" className="rounded-lg bg-blue-50 p-3">Entregado al expediente ficticio: {date(row.deliveredAt)} (Puerto Rico). ID del documento: {row.deliveredDocumentId}. No se volverá a entregar este recibo.</p> : ['MATCHED', 'MANUALLY_MATCHED'].includes(row.status) && delivery?.binding ? <DeliveryForm id={row.id} patient={delivery.binding.user.fullName + ' · ' + delivery.binding.user.email} /> : null}
           <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver últimos eventos de recepción</summary><ul className="space-y-2 border-t pt-3">{row.events.map(event => <li key={event.id}>{actions[event.action] || 'Evento de recepción'} · {date(event.createdAt)} (Puerto Rico){event.actorId && <p className="break-all">Administrador: {event.actorId}</p>}{event.reason && <p className="whitespace-pre-wrap break-words">Motivo: {event.reason}</p>}{event.patientId && <p>Identidad confirmada: {event.patientId}</p>}</li>)}</ul><p className="mt-3 break-all text-sm text-gray-600">ID del recibo: {row.id}. Se muestran hasta 5 eventos recientes.</p></details>
         </article> })}
       </>}
     </section>
-    <section className="rounded-xl bg-blue-50 p-5"><h2 className="text-xl font-semibold">Cómo validar esta etapa</h2><ol className="mt-3 list-decimal space-y-2 pl-6"><li>Preparar una base PostgreSQL aislada y aplicar las tablas de pruebas.</li><li>Enviar los ejemplos ficticios de API JSON, FHIR y HL7.</li><li>Revisar aquí los recibos identificados y pendientes, además de los reenvíos y conflictos.</li><li>Reiniciar el entorno y comprobar que los recibos permanecen disponibles.</li></ol><p className="mt-3 text-gray-700">Los administradores pueden confirmar o rechazar la identificación ficticia pendiente con un motivo obligatorio. Se conserva el mensaje original y el historial. No hay entrega al expediente clínico.</p></section>
+    <section className="rounded-xl bg-blue-50 p-5"><h2 className="text-xl font-semibold">Cómo validar esta etapa</h2><ol className="mt-3 list-decimal space-y-2 pl-6"><li>Preparar una base PostgreSQL aislada y aplicar las tablas de pruebas.</li><li>Enviar los ejemplos ficticios de API JSON, FHIR y HL7.</li><li>Revisar aquí los recibos identificados y pendientes, además de los reenvíos y conflictos.</li><li>Reiniciar el entorno y comprobar que los recibos permanecen disponibles.</li></ol><p className="mt-3 text-gray-700">Los administradores pueden confirmar o rechazar la identificación ficticia pendiente con un motivo obligatorio. Se conserva el mensaje original y el historial. La entrega crea un documento de texto solo en el expediente ficticio vinculado, sin archivos en S3. Paciente, doctor y representante lo consultan desde sus cuentas y permisos vigentes.</p></section>
   </section>
 }

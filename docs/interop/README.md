@@ -140,3 +140,15 @@ activado la recepción ni migrado la base clínica.
 Active admins in the isolated Preview can confirm TEST-PATIENT-001 (2018-04-12) or reject a pending identity. A 10–1000 character reason, explicit confirmation, and a synthetic target on confirmation are required. Decisions transition PENDING_REVIEW to MANUALLY_MATCHED or REJECTED. Status and event (admin ID, timestamp, reason and confirmed target) commit atomically; conditional updates prevent a second decision. Normalized input and fingerprint are unchanged. Retries retain the reviewed status. No User/Document association or clinical delivery is performed. Production remains disabled.
 
 Apply migration 202610290001_interop_review before deploying this version. The synthetic Neon database received the source SQL transactionally and its source checksum was recorded in _prisma_migrations.
+
+## Delivery into a synthetic record
+
+Migration 202610290002_interop_delivery adds an immutable source/identity binding and unique delivered-document reference. It was applied transactionally to the isolated Neon database with the source checksum recorded.
+
+Create a PATIENT account using an @example.test address and birth date 2018-04-12, then activate its license through Admin. Bind TEST-PATIENT-001 once in Interoperability. Confirmation of the account and a reason are required. No existing clinical account is eligible.
+
+Only MATCHED or audited MANUALLY_MATCHED receipts may be delivered. The transaction locks/rechecks the patient, validates the license, creates one private-by-default text Document, conditionally marks the receipt delivered, and records reception/audit events. A competing delivery rolls back its document. Pending and rejected receipts cannot deliver. Soft-deleting a delivered document does not re-enable delivery.
+
+Documents use an interop-sandbox: reference and render as plain text from the persisted normalized message. No S3/Blob credentials or files are required. The view endpoint checks session, active viewer license, existing patient/doctor/guardian authorization, sandbox state, delivered receipt and active synthetic patient license before rendering. Both received and verified birth dates are labeled in the report. No public share links are created for synthetic reports.
+
+Representatives require an active guardian link and proxyVisible, which the admin must opt into at delivery or the existing clinical representative workflow may grant. Doctor access uses the existing DoctorPatient relationship and license filters. Use independent patient/tutor/doctor accounts to validate these flows in the Preview; automated authorization tests do not replace that UI acceptance test.

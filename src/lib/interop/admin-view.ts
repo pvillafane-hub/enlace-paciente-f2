@@ -17,7 +17,7 @@ export async function adminInteropReceipts(filter: InteropFilter) {
   try {
     const receipts = await prisma.interopSandboxReceipt.findMany({
       where: { source: process.env.INTEROP_SANDBOX_SOURCE!, ...(filter === 'ALL' ? {} : { status: filter }) },
-      select: { id: true, source: true, reportId: true, status: true, format: true, normalized: true, createdAt: true,
+      select: { id: true, source: true, reportId: true, status: true, format: true, normalized: true, createdAt: true, deliveredAt: true, deliveredDocumentId: true,
         events: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 5, select: { id: true, action: true, actorId: true, reason: true, patientId: true, createdAt: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50,
     })

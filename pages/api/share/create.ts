@@ -46,6 +46,7 @@ export default async function handler(
     if (!doc) {
       return res.status(400).json({ error: 'Documento no válido.' })
     }
+    if (doc.filePath.startsWith('interop-sandbox:')) return res.status(400).json({ error: 'Los resultados ficticios se consultan desde una cuenta autorizada; no admiten enlaces públicos.' })
 
     // 🔗 3️⃣ Crear token
     const token = crypto.randomUUID()

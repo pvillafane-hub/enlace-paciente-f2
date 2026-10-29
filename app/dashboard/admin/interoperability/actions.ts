@@ -3,8 +3,28 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveAdmin } from '@/lib/admin-session'
 import { sandboxState } from '@/lib/interop/admin-view'
 import { revalidatePath } from 'next/cache'
+import { bindSyntheticPatient, deliverSyntheticReceipt } from '@/lib/interop/delivery'
 
 export type InteropReviewState = { error?: string; success?: string }
+export async function bindInterop(_state: InteropReviewState, data: FormData): Promise<InteropReviewState> {
+  const admin = await requireActiveAdmin()
+  const reason = String(data.get('reason') || '').trim()
+  if (data.get('confirmed') !== 'on' || reason.length < 10 || reason.length > 1000) return { error: 'Confirma la cuenta ficticia y documenta el motivo (10 a 1000 caracteres).' }
+  try {
+    await bindSyntheticPatient(admin.id, String(data.get('userId') || ''), reason)
+    revalidatePath('/dashboard/admin/interoperability')
+    return { success: 'Paciente ficticio vinculado.' }
+  } catch { return { error: 'No se pudo vincular. Verifica la fecha, el correo @example.test y que no exista una vinculación previa.' } }
+}
+export async function deliverInterop(id: string, _state: InteropReviewState, data: FormData): Promise<InteropReviewState> {
+  const admin = await requireActiveAdmin()
+  if (data.get('confirmed') !== 'on') return { error: 'Confirma el destino antes de entregar.' }
+  try {
+    await deliverSyntheticReceipt(admin.id, id, data.get('proxyVisible') === 'on')
+    revalidatePath('/dashboard', 'layout')
+    return { success: 'Resultado ficticio entregado al expediente de pruebas.' }
+  } catch { return { error: 'No se pudo entregar. Verifica la vinculación, la licencia activa del paciente y que el recibo no haya sido entregado.' } }
+}
 export async function reviewInterop(id: string, _state: InteropReviewState, data: FormData): Promise<InteropReviewState> {
   const admin = await requireActiveAdmin()
   if (sandboxState() !== 'ready') return { error: 'La revisión solo está disponible en el entorno aislado de pruebas.' }
