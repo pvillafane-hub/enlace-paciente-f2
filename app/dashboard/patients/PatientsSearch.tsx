@@ -1,5 +1,6 @@
 "use client"
 
+import { formatStudyDate } from '@/lib/study-date'
 import { useState } from "react"
 import Link from "next/link"
 
@@ -93,7 +94,7 @@ export default function PatientsSearch({ patients }: { patients: Patient[] }) {
 
                     <p className="text-gray-500">
                       {p.lastDoc.facility} ·{" "}
-                      {new Date(p.lastDoc.studyDate).toLocaleDateString()}
+                      {formatStudyDate(p.lastDoc.studyDate)}
                     </p>
 
                     {diffDays !== null && (
