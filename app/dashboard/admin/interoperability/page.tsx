@@ -24,6 +24,7 @@ export default async function InteroperabilityPage({ searchParams }: { searchPar
   const delivery = model.state === 'ready' ? await deliveryModel().catch(() => null) : null
   return <section className="min-w-0 space-y-6" aria-labelledby="interop-title">
     <div className="flex flex-wrap items-center gap-3"><h1 id="interop-title" className="text-3xl font-bold">Interoperabilidad</h1><span className="rounded-full bg-indigo-100 px-3 py-2 font-semibold text-indigo-900">Fase 3 · Pruebas</span></div>
+    <Link href="/dashboard/admin/integrations" className="inline-flex min-h-12 items-center rounded-xl border px-4 py-3 font-semibold">Configurar laboratorios</Link>
     <p className="text-lg text-gray-700">Recibe y consulta resultados ficticios de laboratorio por API JSON, FHIR R4 y un perfil limitado de HL7 v2.</p>
     <aside className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950"><h2 className="text-xl font-semibold">Solo datos ficticios</h2><p className="mt-2">Los recibos permanecen separados del expediente clínico. Identificado significa que coincide con un paciente de prueba; no significa entregado al paciente ni al doctor. La entrega se registra por separado y solo se habilita con una cuenta ficticia vinculada.</p></aside>
     <section className="rounded-xl border bg-white p-5" aria-labelledby="connection-title"><h2 id="connection-title" className="text-xl font-semibold">Estado del entorno</h2>

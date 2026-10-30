@@ -337,3 +337,24 @@ model InteropSandboxEvent {
   receipt   InteropSandboxReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   @@index([receiptId, createdAt])
 }
+
+// Administrative drafts only; these records never enable an external connection.
+model InteropIntegrationDraft {
+  id String @id @default(uuid())
+  name String
+  code String @unique
+  protocol String
+  direction String
+  endpoint String?
+  authType String
+  credentialRef String?
+  reviewAll Boolean @default(true)
+  notes String?
+  status String @default("DRAFT")
+  version Int @default(1)
+  createdById String
+  updatedById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, updatedAt])
+}

@@ -159,3 +159,16 @@ Representatives require an active guardian link and proxyVisible, which the admi
 Synthetic document views now use a responsive Spanish report with an 18px base font, prominent result values, wrapping identifiers, and the original text in an expandable section. Existing authorization, licenses, source scoping, and production disablement still run before rendering. No public report URL is introduced.
 
 Guardian forms dispatch within a transition without an automatic form reset: errors retain values and focus the message; only success resets the form. Approval checks identify missing identity/authority, minor verification, and validity fields before submission. Server validation remains authoritative, including revocations and future validity. Existing review dates display in Puerto Rico calendar time.
+
+
+## Integration configuration drafts
+
+Admin → Integraciones (`/dashboard/admin/integrations`) stores laboratory preparation records in InteropIntegrationDraft. Migration 202610300001_integration_drafts adds the table and database constraints. It is applied only to the isolated synthetic database; no clinical database changes are required.
+
+Active admins may create, search, edit or pause drafts. Each TEST- code is unique. Formats are API JSON, limited FHIR R4 and limited HL7 v2 ORU. Direction, HTTPS endpoint, proposed authentication, credential reference, planned manual review and coordination notes persist. Credentials themselves are never requested: only references prefixed env:, secret:, or an AWS Secrets Manager ARN are accepted. References are not resolved or verified by this screen. URLs reject embedded credentials, query parameters and fragments.
+
+All records remain DRAFT or PAUSED. Saving does not register a source with the intake route, change its token, connect to an endpoint, open MLLP, schedule polling, activate OAuth/mTLS, deliver results or alter patient matching. Planned rules become effective only when a connector is implemented and validated with the lab. The existing sandbox intake and inbox remain independent. No network probe occurs, so basic field completeness must not be described as connectivity or compatibility validation.
+
+Writes recheck the active admin in a serializable transaction, use optimistic versions for edits, and record an audit event without credentials, notes or endpoint details. Duplicate codes and stale edits return safe messages; controlled fields retain their values after an error. Production and non-isolated environments do not read or write drafts.
+
+Manual acceptance: save a new fictitious lab, reload and search its code, edit and pause it, verify stale edits are rejected, and confirm the interoperability inbox is unchanged. Technical lab validation and live connector activation are separate future work.
