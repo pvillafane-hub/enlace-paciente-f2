@@ -27,7 +27,7 @@ it('enforces session, license and document authorization before reading a synthe
 })
 it('returns text only to authorized viewers, with no caching or object-storage access', async () => {
   const res = await request()
-  expect(res.send).toHaveBeenCalledWith('SOLO PRUEBAS'); expect(res.setHeader).toHaveBeenCalledWith('Content-Type','text/plain; charset=utf-8')
+  expect(res.send).toHaveBeenCalledWith(expect.stringContaining('name="viewport"')); expect(res.setHeader).toHaveBeenCalledWith('Content-Type','text/html; charset=utf-8')
   expect(res.setHeader).toHaveBeenCalledWith('Cache-Control','private, no-store'); expect(m.storage).not.toHaveBeenCalled()
   expect(m.audit).toHaveBeenCalledWith({ userId: 'viewer', action: 'DOCUMENT_VIEW', entityId: 'd1' })
 })

@@ -149,6 +149,13 @@ Create a PATIENT account using an @example.test address and birth date 2018-04-1
 
 Only MATCHED or audited MANUALLY_MATCHED receipts may be delivered. The transaction locks/rechecks the patient, validates the license, creates one private-by-default text Document, conditionally marks the receipt delivered, and records reception/audit events. A competing delivery rolls back its document. Pending and rejected receipts cannot deliver. Soft-deleting a delivered document does not re-enable delivery.
 
-Documents use an interop-sandbox: reference and render as plain text from the persisted normalized message. No S3/Blob credentials or files are required. The view endpoint checks session, active viewer license, existing patient/doctor/guardian authorization, sandbox state, delivered receipt and active synthetic patient license before rendering. Both received and verified birth dates are labeled in the report. No public share links are created for synthetic reports.
+Documents use an interop-sandbox: reference and render as a responsive HTML page from the persisted normalized message (with the original text available in a disclosure). No S3/Blob credentials or files are required. The view endpoint checks session, active viewer license, existing patient/doctor/guardian authorization, sandbox state, delivered receipt and active synthetic patient license before rendering. HTML values are escaped, scripts and external resources are blocked by CSP, and responses remain private/no-store. Both received and verified birth dates are labeled in the report. No public share links are created for synthetic reports.
 
 Representatives require an active guardian link and proxyVisible, which the admin must opt into at delivery or the existing clinical representative workflow may grant. Doctor access uses the existing DoctorPatient relationship and license filters. Use independent patient/tutor/doctor accounts to validate these flows in the Preview; automated authorization tests do not replace that UI acceptance test.
+
+
+## Mobile report and guardian review usability
+
+Synthetic document views now use a responsive Spanish report with an 18px base font, prominent result values, wrapping identifiers, and the original text in an expandable section. Existing authorization, licenses, source scoping, and production disablement still run before rendering. No public report URL is introduced.
+
+Guardian forms dispatch within a transition without an automatic form reset: errors retain values and focus the message; only success resets the form. Approval checks identify missing identity/authority, minor verification, and validity fields before submission. Server validation remains authoritative, including revocations and future validity. Existing review dates display in Puerto Rico calendar time.

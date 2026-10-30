@@ -6,6 +6,7 @@ import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { readDocument } from '@/lib/document-storage'
 import { Readable } from 'node:stream'
+import { syntheticReportHtml } from '@/lib/interop/report-html'
 import { syntheticDocumentText } from '@/lib/interop/delivery'
 
 export default async function handler(
@@ -73,9 +74,11 @@ export default async function handler(
       if (!report) return res.status(404).json({ error: 'Resultado ficticio no disponible' })
       await auditLog({ userId, action: 'DOCUMENT_VIEW', entityId: id })
       res.setHeader('Cache-Control', 'private, no-store')
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+      res.setHeader('Referrer-Policy', 'no-referrer')
       res.setHeader('X-Content-Type-Options', 'nosniff')
-      return res.status(200).send(report)
+      return res.status(200).send(syntheticReportHtml(report))
     }
     const file = await readDocument(document.filePath)
     if (!file || file.statusCode !== 200) return res.status(404).json({ error: 'Documento no disponible' })
