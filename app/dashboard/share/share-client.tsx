@@ -1,5 +1,6 @@
 'use client'
 
+import { formatStudyDate } from '@/lib/study-date'
 import { useState } from 'react'
 
 type Document = {
@@ -83,7 +84,7 @@ export default function ShareClient({
             {documents.map(doc => (
               <option key={doc.id} value={doc.id}>
                 {doc.filename} · {doc.docType} ·{' '}
-                {new Date(doc.studyDate).toLocaleDateString('es-PR')}
+                {formatStudyDate(doc.studyDate)}
               </option>
             ))}
           </select>

@@ -1,3 +1,4 @@
+import { formatStudyDate } from '@/lib/study-date'
 import { allergyState } from '@/lib/patient-profile-policy'
 import { getLicenseAccess } from '@/lib/license-access'
 import { canReadPatient } from '@/lib/access'
@@ -192,7 +193,7 @@ export default async function PatientPage({
             {latestDoc && (entitlement.active || isDemo) && (
               <p className="text-sm text-gray-500 mt-2">
                 Fecha del estudio más reciente ·{" "}
-                {new Date(latestDoc.studyDate).toLocaleDateString('es-PR')}
+                {formatStudyDate(latestDoc.studyDate)}
               </p>
             )}
           </div>

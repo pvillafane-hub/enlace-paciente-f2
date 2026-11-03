@@ -134,3 +134,41 @@ entorno. Diferencia una bandeja vacía de una base de datos no disponible.
 Para verlo en la aplicación habitual hace falta integrar esta rama en la rama
 que alimenta ese despliegue. El trabajo está en la rama de fase 3; no se ha
 activado la recepción ni migrado la base clínica.
+
+## Manual synthetic identity review
+
+Active admins in the isolated Preview can confirm TEST-PATIENT-001 (2018-04-12) or reject a pending identity. A 10–1000 character reason, explicit confirmation, and a synthetic target on confirmation are required. Decisions transition PENDING_REVIEW to MANUALLY_MATCHED or REJECTED. Status and event (admin ID, timestamp, reason and confirmed target) commit atomically; conditional updates prevent a second decision. Normalized input and fingerprint are unchanged. Retries retain the reviewed status. No User/Document association or clinical delivery is performed. Production remains disabled.
+
+Apply migration 202610290001_interop_review before deploying this version. The synthetic Neon database received the source SQL transactionally and its source checksum was recorded in _prisma_migrations.
+
+## Delivery into a synthetic record
+
+Migration 202610290002_interop_delivery adds an immutable source/identity binding and unique delivered-document reference. It was applied transactionally to the isolated Neon database with the source checksum recorded.
+
+Create a PATIENT account using an @example.test address and birth date 2018-04-12, then activate its license through Admin. Bind TEST-PATIENT-001 once in Interoperability. Confirmation of the account and a reason are required. No existing clinical account is eligible.
+
+Only MATCHED or audited MANUALLY_MATCHED receipts may be delivered. The transaction locks/rechecks the patient, validates the license, creates one private-by-default text Document, conditionally marks the receipt delivered, and records reception/audit events. A competing delivery rolls back its document. Pending and rejected receipts cannot deliver. Soft-deleting a delivered document does not re-enable delivery.
+
+Documents use an interop-sandbox: reference and render as a responsive HTML page from the persisted normalized message (with the original text available in a disclosure). No S3/Blob credentials or files are required. The view endpoint checks session, active viewer license, existing patient/doctor/guardian authorization, sandbox state, delivered receipt and active synthetic patient license before rendering. HTML values are escaped, scripts and external resources are blocked by CSP, and responses remain private/no-store. Both received and verified birth dates are labeled in the report. No public share links are created for synthetic reports.
+
+Representatives require an active guardian link and proxyVisible, which the admin must opt into at delivery or the existing clinical representative workflow may grant. Doctor access uses the existing DoctorPatient relationship and license filters. Use independent patient/tutor/doctor accounts to validate these flows in the Preview; automated authorization tests do not replace that UI acceptance test.
+
+
+## Mobile report and guardian review usability
+
+Synthetic document views now use a responsive Spanish report with an 18px base font, prominent result values, wrapping identifiers, and the original text in an expandable section. Existing authorization, licenses, source scoping, and production disablement still run before rendering. No public report URL is introduced.
+
+Guardian forms dispatch within a transition without an automatic form reset: errors retain values and focus the message; only success resets the form. Approval checks identify missing identity/authority, minor verification, and validity fields before submission. Server validation remains authoritative, including revocations and future validity. Existing review dates display in Puerto Rico calendar time.
+
+
+## Integration configuration drafts
+
+Admin → Integraciones (`/dashboard/admin/integrations`) stores laboratory preparation records in InteropIntegrationDraft. Migration 202610300001_integration_drafts adds the table and database constraints. It is applied only to the isolated synthetic database; no clinical database changes are required.
+
+Active admins may create, search, edit or pause drafts. Each TEST- code is unique. Formats are API JSON, limited FHIR R4 and limited HL7 v2 ORU. Direction, HTTPS endpoint, proposed authentication, credential reference, planned manual review and coordination notes persist. Credentials themselves are never requested: only references prefixed env:, secret:, or an AWS Secrets Manager ARN are accepted. References are not resolved or verified by this screen. URLs reject embedded credentials, query parameters and fragments.
+
+All records remain DRAFT or PAUSED. Saving does not register a source with the intake route, change its token, connect to an endpoint, open MLLP, schedule polling, activate OAuth/mTLS, deliver results or alter patient matching. Planned rules become effective only when a connector is implemented and validated with the lab. The existing sandbox intake and inbox remain independent. No network probe occurs, so basic field completeness must not be described as connectivity or compatibility validation.
+
+Writes recheck the active admin in a serializable transaction, use optimistic versions for edits, and record an audit event without credentials, notes or endpoint details. Duplicate codes and stale edits return safe messages; controlled fields retain their values after an error. Production and non-isolated environments do not read or write drafts.
+
+Manual acceptance: save a new fictitious lab, reload and search its code, edit and pause it, verify stale edits are rejected, and confirm the interoperability inbox is unchanged. Technical lab validation and live connector activation are separate future work.

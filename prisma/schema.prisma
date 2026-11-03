@@ -40,6 +40,7 @@ model User {
   createdAt    DateTime @default(now())
 
   guardianLinks GuardianLink[] @relation("GuardianLinks")
+  interopBindings InteropSandboxPatient[]
   representatives GuardianLink[] @relation("Representatives")
   qrTokens PatientQRToken[]  // 🔥 relación QR
 
@@ -106,6 +107,7 @@ model Document {
 
   user   User        @relation(fields: [userId], references: [id])
   shares ShareLink[]
+  interopReceipt InteropSandboxReceipt?
   @@index([userId, deletedAt, createdAt])
 }
 
@@ -305,16 +307,54 @@ model InteropSandboxReceipt {
   format      String
   status      String
   normalized  Json
+  deliveredDocumentId String? @unique
+  deliveredAt DateTime?
+  deliveryDocument Document? @relation(fields: [deliveredDocumentId], references: [id])
   createdAt   DateTime @default(now())
   events      InteropSandboxEvent[]
   @@unique([source, reportId])
+}
+
+model InteropSandboxPatient {
+  id String @id @default(uuid())
+  source String
+  externalPatientId String
+  userId String
+  createdById String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+  @@unique([source, externalPatientId])
 }
 
 model InteropSandboxEvent {
   id        String @id @default(uuid())
   receiptId String
   action    String
+  actorId   String?
+  reason    String?
+  patientId String?
   createdAt DateTime @default(now())
   receipt   InteropSandboxReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   @@index([receiptId, createdAt])
+}
+
+// Administrative drafts only; these records never enable an external connection.
+model InteropIntegrationDraft {
+  id String @id @default(uuid())
+  name String
+  code String @unique
+  protocol String
+  direction String
+  endpoint String?
+  authType String
+  credentialRef String?
+  reviewAll Boolean @default(true)
+  notes String?
+  status String @default("DRAFT")
+  version Int @default(1)
+  createdById String
+  updatedById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, updatedAt])
 }
