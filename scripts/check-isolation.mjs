@@ -1,5 +1,6 @@
 // A branch preview in the original project is not an isolated environment.
-if (process.env.VERCEL && process.env.VERCEL_GIT_COMMIT_REF === 'Fase3') {
+const fase3Branch = process.env.VERCEL_GIT_COMMIT_REF === 'Fase3' || process.env.VERCEL_GIT_COMMIT_REF?.startsWith('Fase3-');
+if (process.env.VERCEL && fase3Branch) {
   if (process.env.VERCEL_PROJECT_ID !== 'prj_TTNAKJs9CbAfeoKtLeVhVxtgVJFQ' || process.env.ENLACE_ISOLATED_ENVIRONMENT !== 'true') {
     console.error('Deployment blocked: Fase3 requires its own isolated Vercel project.');
     process.exit(1);

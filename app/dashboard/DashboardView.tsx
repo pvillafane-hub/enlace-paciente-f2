@@ -1,5 +1,6 @@
 "use client";
 
+import { formatStudyDate, studyDateYear } from '@/lib/study-date'
 import EntrarFacilButton from "@/components/EntrarFacilButton";
 
 interface Document {
@@ -32,7 +33,7 @@ export default function DashboardView({ user, passkeyEnabled, canOpen }: Dashboa
   const latestDocument = sortedDocuments[0];
 
   const documentsByYear = sortedDocuments.reduce((groups, doc) => {
-    const year = new Date(doc.studyDate).getFullYear();
+    const year = studyDateYear(doc.studyDate);
 
     if (!groups[year]) {
       groups[year] = [];
@@ -170,7 +171,7 @@ export default function DashboardView({ user, passkeyEnabled, canOpen }: Dashboa
 
           <p className="text-gray-600">
             <strong>Fecha:</strong>{" "}
-            {new Date(latestDocument.studyDate).toLocaleDateString()}
+            {formatStudyDate(latestDocument.studyDate)}
           </p>
 
           <div className="pt-4 flex gap-3 flex-wrap">
@@ -267,7 +268,7 @@ export default function DashboardView({ user, passkeyEnabled, canOpen }: Dashboa
 
                     <p className="text-gray-600">
                       <strong>Fecha:</strong>{" "}
-                      {new Date(doc.studyDate).toLocaleDateString()}
+                      {formatStudyDate(doc.studyDate)}
                     </p>
 
                     <div className="pt-4 flex flex-wrap gap-3">
