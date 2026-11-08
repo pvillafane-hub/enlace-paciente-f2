@@ -6,49 +6,121 @@ import { requireActiveAdmin } from '@/lib/admin-session'
 import { adminInteropReceipts, interopFilter, safeResultSummary } from '@/lib/interop/admin-view'
 
 export const dynamic = 'force-dynamic'
-const labels = { ALL: 'Todos', MATCHED: 'Identificados', PENDING_REVIEW: 'Pendientes de identificación', MANUALLY_MATCHED: 'Confirmados manualmente', REJECTED: 'Rechazados' }
-const actions: Record<string, string> = {
-  DELIVERED_TO_SYNTHETIC_RECORD: 'Resultado entregado al expediente ficticio',
-  IDENTITY_CONFIRMED_MANUALLY: 'Identidad ficticia confirmada por administrador',
-  IDENTITY_REJECTED: 'Identificación rechazada por administrador',
-  RECEIVED_MATCHED: 'Recibido e identificado en pruebas',
-  RECEIVED_PENDING_REVIEW: 'Recibido; identidad pendiente',
+
+const filters = {
+  ALL: 'Todos',
+  MATCHED: 'Identificados',
+  PENDING_REVIEW: 'Por revisar',
+  MANUALLY_MATCHED: 'Confirmados',
+  REJECTED: 'Rechazados',
+}
+const statusLabels: Record<string, [string, string]> = {
+  MATCHED: ['Listo para entregar', 'bg-emerald-50 text-emerald-800'],
+  MANUALLY_MATCHED: ['Identidad confirmada', 'bg-emerald-50 text-emerald-800'],
+  PENDING_REVIEW: ['Requiere revisión', 'bg-amber-50 text-amber-900'],
+  REJECTED: ['Rechazado', 'bg-rose-50 text-rose-800'],
+}
+const activityLabels: Record<string, string> = {
+  DELIVERED_TO_SYNTHETIC_RECORD: 'Entregado al expediente',
+  IDENTITY_CONFIRMED_MANUALLY: 'Identidad confirmada',
+  IDENTITY_REJECTED: 'Identificación rechazada',
+  RECEIVED_MATCHED: 'Recibido e identificado',
+  RECEIVED_PENDING_REVIEW: 'Recibido para revisión',
   DUPLICATE_RECEIVED: 'Reenvío idéntico reconocido',
   CONFLICT_REJECTED: 'Reenvío con cambios rechazado',
 }
-const date = (value: Date) => value.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico' })
+const unavailable = {
+  disabled: ['Recepción de pruebas deshabilitada', 'La bandeja de demostración está disponible en el entorno aislado.'],
+  unconfigured: ['Configuración de pruebas incompleta', 'Pide al equipo técnico que termine de preparar el entorno de demostración.'],
+  unavailable: ['Bandeja temporalmente no disponible', 'Vuelve a cargar la página en unos minutos.'],
+}
+const date = (value: Date) => value.toLocaleString('es-PR', {
+  dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Puerto_Rico',
+})
+const panel = 'min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm'
+const disclosure = 'cursor-pointer rounded-xl px-4 py-3 font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700'
+
 export default async function InteroperabilityPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   await requireActiveAdmin(true)
   const filter = interopFilter((await searchParams).status)
   const model = await adminInteropReceipts(filter)
   const delivery = model.state === 'ready' ? await deliveryModel().catch(() => null) : null
+  const binding = delivery?.binding
+
   return <section className="min-w-0 space-y-6" aria-labelledby="interop-title">
-    <div className="flex flex-wrap items-center gap-3"><h1 id="interop-title" className="text-3xl font-bold">Interoperabilidad</h1><span className="rounded-full bg-indigo-100 px-3 py-2 font-semibold text-indigo-900">Fase 3 · Pruebas</span></div>
-    <Link href="/dashboard/admin/integrations" className="inline-flex min-h-12 items-center rounded-xl border px-4 py-3 font-semibold">Configurar laboratorios</Link>
-    <p className="text-lg text-gray-700">Recibe y consulta resultados ficticios de laboratorio por API JSON, FHIR R4 y un perfil limitado de HL7 v2.</p>
-    <aside className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950"><h2 className="text-xl font-semibold">Solo datos ficticios</h2><p className="mt-2">Los recibos permanecen separados del expediente clínico. Identificado significa que coincide con un paciente de prueba; no significa entregado al paciente ni al doctor. La entrega se registra por separado y solo se habilita con una cuenta ficticia vinculada.</p></aside>
-    <section className="rounded-xl border bg-white p-5" aria-labelledby="connection-title"><h2 id="connection-title" className="text-xl font-semibold">Estado del entorno</h2>
-      <p role="status" className="mt-3 font-semibold">{model.state === 'ready' ? 'Entorno de pruebas habilitado' : model.state === 'disabled' ? 'Recepción de pruebas deshabilitada' : model.state === 'unconfigured' ? 'Configuración de pruebas incompleta' : 'Bandeja temporalmente no disponible'}</p>
-      <p className="mt-2 text-gray-700">{model.state === 'ready' ? 'La bandeja consulta recibos de una fuente de pruebas. No hay una conexión con un laboratorio real validada.' : model.state === 'disabled' ? 'Para recibir mensajes se necesita un entorno aislado. La recepción no se habilita en producción.' : model.state === 'unconfigured' ? 'El responsable técnico debe completar la fuente y la credencial del entorno aislado.' : 'No se pudieron consultar los recibos. Verifica la base aislada y sus migraciones; después vuelve a intentar.'}</p>
-      <dl className="mt-4 grid gap-4 sm:grid-cols-3">{[['API JSON', 'Resultados finales'], ['FHIR R4', 'Bundle de laboratorio limitado'], ['HL7 v2.5.1', 'ORU R01 de pruebas']].map(([title, detail]) => <div key={title}><dt className="font-semibold">{title}</dt><dd className="text-gray-600">{detail}</dd></div>)}</dl>
-    </section>
-    {model.state === 'ready' && <section className="space-y-4 rounded-xl border bg-white p-5"><h2 className="text-xl font-semibold">Destino del expediente ficticio</h2>{delivery?.binding ? <p>TEST-PATIENT-001 → {delivery.binding.user.fullName} · {delivery.binding.user.email}</p> : delivery ? <><p>Registra una cuenta de paciente con correo terminado en @example.test y nacimiento 2018-04-12. Activa su licencia desde Administración. Solo se admiten cuentas ficticias activas con identidad validada.</p>{delivery.candidates.length ? <BindingForm candidates={delivery.candidates} /> : <p className="font-semibold">Todavía no hay una cuenta ficticia elegible para vincular.</p>}</> : <p>No se pudo consultar la vinculación. Vuelve a cargar la página.</p>}</section>}
-    <section aria-labelledby="inbox-title"  className="space-y-4"><h2 id="inbox-title" className="text-2xl font-semibold">Bandeja de resultados de prueba</h2>
-      <nav aria-label="Filtrar recibos" className="flex flex-wrap gap-3">{Object.entries(labels).map(([key, label]) => <Link key={key} href={`?status=${key}`} aria-current={filter === key ? 'page' : undefined} className={`inline-flex min-h-12 items-center rounded-xl border px-4 py-3 font-semibold ${filter === key ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 bg-white text-gray-800'}`}>{label}</Link>)}</nav>
-      {model.state === 'ready' && <><p className="text-gray-600">Mostrando los últimos {model.receipts.length} recibos del filtro seleccionado, hasta un máximo de 50. Los reenvíos aparecen dentro del recibo original.</p>
-        {model.receipts.length === 0 && <p className="rounded-xl border border-dashed p-6">No hay recibos para este filtro. Envía un resultado ficticio desde el entorno de integración para comenzar.</p>}
-        {model.receipts.map(row => { const summary = safeResultSummary(row.normalized); return <article key={row.id} className="min-w-0 space-y-4 rounded-xl border bg-white p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3"><h3 className="break-all text-xl font-semibold">{row.reportId}</h3><span className={`rounded-full px-3 py-2 font-semibold ${['MATCHED', 'MANUALLY_MATCHED'].includes(row.status) ? 'bg-green-100 text-green-950' : 'bg-amber-100 text-amber-950'}`}>{row.status === 'MATCHED' ? 'Identificado en pruebas' : row.status === 'MANUALLY_MATCHED' ? 'Confirmado manualmente en pruebas' : row.status === 'REJECTED' ? 'Identificación rechazada' : 'Pendiente de identificación'}</span></div>
-          <p className="break-words text-gray-600">Fuente: {row.source} · Formato: {row.format} · Recibido: {date(row.createdAt)} (Puerto Rico)</p>
-          {summary && <dl className="grid gap-4 sm:grid-cols-2"><div><dt className="font-semibold">Paciente ficticio</dt><dd className="break-all">{summary.patientId}</dd></div><div><dt className="font-semibold">Fecha de nacimiento</dt><dd>{summary.birthDate}</dd></div><div><dt className="font-semibold">Código de prueba</dt><dd className="break-all">{summary.testCode}</dd></div><div><dt className="font-semibold">Emisión del laboratorio</dt><dd className="break-all">{summary.issued}</dd></div></dl>}
-          {summary && summary.observations.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver valores del resultado ficticio</summary><ul className="space-y-3 border-t pt-3">{summary.observations.map((observation, index) => <li key={index} className="flex flex-wrap justify-between gap-3 rounded-lg bg-gray-50 p-3"><span className="break-all">Código: {observation.code}</span><span className="break-all font-semibold">{observation.value} {observation.unit}</span></li>)}</ul></details>}
-          {row.status === 'PENDING_REVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">El identificador o la fecha de nacimiento no coincide con el paciente ficticio configurado. Este resultado no se asignó a un expediente. Revisa la discrepancia antes de registrar una decisión.</p>}
-          {row.status === 'PENDING_REVIEW' && <ReviewForm id={row.id} />}
-          {row.deliveredAt ? <p role="status" className="rounded-lg bg-blue-50 p-3">Entregado al expediente ficticio: {date(row.deliveredAt)} (Puerto Rico). ID del documento: {row.deliveredDocumentId}. No se volverá a entregar este recibo.</p> : ['MATCHED', 'MANUALLY_MATCHED'].includes(row.status) && delivery?.binding ? <DeliveryForm id={row.id} patient={delivery.binding.user.fullName + ' · ' + delivery.binding.user.email} /> : null}
-          <details className="rounded-lg border p-3"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Ver últimos eventos de recepción</summary><ul className="space-y-2 border-t pt-3">{row.events.map(event => <li key={event.id}>{actions[event.action] || 'Evento de recepción'} · {date(event.createdAt)} (Puerto Rico){event.actorId && <p className="break-all">Administrador: {event.actorId}</p>}{event.reason && <p className="whitespace-pre-wrap break-words">Motivo: {event.reason}</p>}{event.patientId && <p>Identidad confirmada: {event.patientId}</p>}</li>)}</ul><p className="mt-3 break-all text-sm text-gray-600">ID del recibo: {row.id}. Se muestran hasta 5 eventos recientes.</p></details>
-        </article> })}
-      </>}
-    </section>
-    <section className="rounded-xl bg-blue-50 p-5"><h2 className="text-xl font-semibold">Cómo validar esta etapa</h2><ol className="mt-3 list-decimal space-y-2 pl-6"><li>Preparar una base PostgreSQL aislada y aplicar las tablas de pruebas.</li><li>Enviar los ejemplos ficticios de API JSON, FHIR y HL7.</li><li>Revisar aquí los recibos identificados y pendientes, además de los reenvíos y conflictos.</li><li>Reiniciar el entorno y comprobar que los recibos permanecen disponibles.</li></ol><p className="mt-3 text-gray-700">Los administradores pueden confirmar o rechazar la identificación ficticia pendiente con un motivo obligatorio. Se conserva el mensaje original y el historial. La entrega crea un documento de texto solo en el expediente ficticio vinculado, sin archivos en S3. Paciente, doctor y representante lo consultan desde sus cuentas y permisos vigentes.</p></section>
+    <header className="rounded-2xl bg-slate-900 px-5 py-7 text-white sm:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-5">
+        <div className="space-y-3">
+          <span className="inline-flex rounded-full bg-blue-200 px-3 py-1 text-sm font-semibold text-blue-950">Piloto · Solo datos ficticios</span>
+          <h1 id="interop-title" className="text-3xl font-bold sm:text-4xl">Interoperabilidad</h1>
+          <p className="max-w-xl text-slate-200">Revisa los resultados de laboratorio y entrégalos al expediente de demostración.</p>
+        </div>
+        <Link href="/dashboard/admin/integrations" className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 py-2 font-semibold text-slate-900 hover:bg-blue-50">Gestionar laboratorios</Link>
+      </div>
+    </header>
+
+    {model.state !== 'ready' ? <div role="status" className={panel + ' p-5'}>
+      <h2 className="text-lg font-bold">{unavailable[model.state][0]}</h2>
+      <p className="mt-1 text-slate-600">{unavailable[model.state][1]}</p>
+    </div> : <>
+      <section aria-labelledby="destination-title" className={panel + ' p-5'}>
+        <h2 id="destination-title" className="text-sm font-semibold text-slate-600">Expediente de demostración</h2>
+        {binding ? <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0"><p className="break-words font-bold">{binding.user.fullName}</p><p className="break-all text-sm text-slate-600">{binding.user.email}</p></div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800">Cuenta vinculada</span>
+        </div> : delivery?.candidates.length ? <details className="mt-2">
+          <summary className={disclosure}>Vincular una cuenta de prueba</summary>
+          <div className="mt-3"><BindingForm candidates={delivery.candidates} /></div>
+        </details> : <p className="mt-2 text-slate-700">{delivery ? 'No hay una cuenta de prueba elegible para vincular.' : 'No se pudo consultar la vinculación. Vuelve a cargar la página.'}</p>}
+      </section>
+
+      <section aria-labelledby="inbox-title" className="space-y-4">
+        <div>
+          <h2 id="inbox-title" className="text-2xl font-bold">Bandeja de resultados</h2>
+          <p className="mt-1 text-sm text-slate-600">Hora de Puerto Rico · Hasta 50 resultados por filtro</p>
+        </div>
+        <nav aria-label="Filtrar resultados" className="flex flex-wrap gap-2">
+          {Object.entries(filters).map(([key, label]) => <Link key={key} href={`?status=${key}`} aria-current={filter === key ? 'page' : undefined} className={`inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold ${filter === key ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-400'}`}>{label}</Link>)}
+        </nav>
+        {model.receipts.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600">No hay recibos para este filtro.</p>}
+        {model.receipts.map(row => {
+          const [label, tone] = row.deliveredAt ? ['Entregado', 'bg-blue-50 text-blue-900'] : statusLabels[row.status] ?? ['Estado no disponible', 'bg-slate-100 text-slate-800']
+          const pending = row.status === 'PENDING_REVIEW'
+          const identity = pending ? safeResultSummary(row.normalized) : null
+          return <article key={row.id} className={panel + ' space-y-4 p-5'}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold">Resultado de laboratorio</h3>
+                <p className="mt-1 text-sm text-slate-600">Recibido: {date(row.createdAt)}</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone}`}>{label}</span>
+            </div>
+            {row.deliveredAt ? <p className="text-sm text-slate-700">Entregado al expediente de demostración el {date(row.deliveredAt)}.</p> : pending ? <details className="rounded-xl border border-amber-200 bg-amber-50">
+              <summary className={disclosure}>Revisar identificación</summary>
+              <div className="space-y-3 p-4">
+                <p className="text-amber-950">El resultado no se asignó a un expediente. Verifica la discrepancia antes de registrar tu decisión.</p>
+                {identity && <dl className="grid gap-3 sm:grid-cols-2">
+                  <div className="min-w-0"><dt className="text-sm font-semibold">Identificador recibido</dt><dd className="break-all">{identity.patientId}</dd></div>
+                  <div><dt className="text-sm font-semibold">Nacimiento recibido</dt><dd>{identity.birthDate}</dd></div>
+                </dl>}
+                <ReviewForm id={row.id} />
+              </div>
+            </details> : (row.status === 'MATCHED' || row.status === 'MANUALLY_MATCHED') && (binding ? <details className="rounded-xl border border-blue-100 bg-blue-50/40">
+              <summary className={disclosure}>Preparar entrega</summary>
+              <div className="p-3"><DeliveryForm id={row.id} patient={binding.user.fullName + ' · ' + binding.user.email} /></div>
+            </details> : <p className="text-sm text-slate-700">Vincula una cuenta de prueba para entregar el resultado.</p>)}
+            <details className="rounded-xl border border-slate-200">
+              <summary className={disclosure}>Ver actividad</summary>
+              <div className="space-y-3 px-4 pb-4 text-sm text-slate-700">
+                <p className="break-all">Referencia del informe: {row.reportId}</p>
+                <ul className="space-y-2">
+                  {row.events.map(event => <li key={event.id}>{activityLabels[event.action] || 'Actividad registrada'} · {date(event.createdAt)}</li>)}
+                </ul>
+              </div>
+            </details>
+          </article>
+        })}
+      </section>
+    </>}
   </section>
 }

@@ -53,3 +53,19 @@ it('handles unexpected stored JSON without rendering arbitrary structures', () =
   expect(safeResultSummary(null)).toBeNull(); expect(safeResultSummary([])).toBeNull()
   expect(safeResultSummary({ patientId: {} })?.patientId).toBe('No disponible')
 })
+
+it('keeps message contents and audit internals out of the pilot inbox', async () => {
+  m.list.mockResolvedValue([{
+    id: 'internal-receipt-id', reportId: 'TEST-REPORT-001', status: 'MATCHED',
+    createdAt: new Date('2026-11-08T13:07:16Z'), deliveredAt: new Date('2026-11-08T13:30:00Z'),
+    deliveredDocumentId: 'internal-document-id', format: 'hl7-v2', source: 'TEST-LAB',
+    normalized: { patientId: 'TEST-PATIENT-001', observations: [{ code: '718-7', value: '12.4', unit: 'g/dL' }] },
+    events: [{ id: 'e1', action: 'DELIVERED_TO_SYNTHETIC_RECORD', createdAt: new Date(), actorId: 'internal-admin-id', reason: 'internal-review-note' }],
+  }])
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }))
+  expect(html).toContain('Entregado al expediente')
+  expect(html).toContain('TEST-REPORT-001')
+  for (const detail of ['hl7-v2', 'TEST-LAB', '718-7', 'g/dL', 'TEST-PATIENT-001', 'internal-document-id', 'internal-admin-id', 'internal-review-note']) {
+    expect(html).not.toContain(detail)
+  }
+})
