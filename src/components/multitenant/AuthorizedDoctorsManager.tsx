@@ -7,6 +7,7 @@ type Doctor = { id: string; fullName: string }
 type Grant = {
   id: string
   status: 'ACTIVE' | 'REVOKED' | 'EXPIRED'
+  effective: boolean
   scope: 'READ_RECORD' | 'READ_AND_UPLOAD' | 'READ_UPLOAD_CATEGORIZE'
   validUntil: string | null
   revokedAt: string | null
@@ -19,12 +20,6 @@ const permissionLabels: Record<Grant['scope'], string> = {
   READ_RECORD: 'Consultar mi expediente',
   READ_AND_UPLOAD: 'Consultar y subir estudios',
   READ_UPLOAD_CATEGORIZE: 'Consultar, subir y categorizar estudios',
-}
-
-function isEffective(grant: Grant) {
-  return grant.status === 'ACTIVE' &&
-    grant.organization.status === 'ACTIVE' &&
-    (!grant.validUntil || new Date(grant.validUntil).getTime() > Date.now())
 }
 
 export default function AuthorizedDoctorsManager() {
@@ -171,7 +166,7 @@ export default function AuthorizedDoctorsManager() {
         grants.length === 0 ? <p>No tienes autorizaciones registradas.</p> :
         <ul className="space-y-3">
           {grants.map(grant => {
-            const effective = isEffective(grant)
+            const effective = grant.effective
             return (
               <li key={grant.id} className="rounded-lg border p-4 space-y-2">
                 <div className="font-semibold">{grant.doctor.fullName}</div>
