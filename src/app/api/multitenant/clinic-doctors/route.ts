@@ -33,6 +33,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
     }
 
+    // Do not disclose another clinic's roster to unrelated patients.
+    const association = await prisma.patientOrganization.findUnique({
+      where: {
+        organizationId_patientId: {
+          organizationId,
+          patientId: session.userId,
+        },
+      },
+      select: { active: true },
+    })
+    if (!association?.active) {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+    }
+
     const members = await prisma.organizationMember.findMany({
       where: {
         organizationId,
