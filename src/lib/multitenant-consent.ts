@@ -67,7 +67,28 @@ export async function grantDoctorAccess(input: {
         status: 'ACTIVE',
       },
     })
-    if (existing) throw new ConsentError('ALREADY_GRANTED')
+    if (existing) {
+      // Expired-by-time grants remain ACTIVE in the database. Retire them
+      // atomically so the partial unique index allows a fresh authorization.
+      if (!existing.validUntil || existing.validUntil > new Date()) {
+        throw new ConsentError('ALREADY_GRANTED')
+      }
+      await tx.medicalAccessGrant.update({
+        where: { id: existing.id },
+        data: { status: 'EXPIRED' },
+      })
+      await tx.accessAuditEvent.create({
+        data: {
+          organizationId: input.organizationId,
+          actorId: input.patientId,
+          patientId: input.patientId,
+          action: 'EXPIRE_DOCTOR_ACCESS',
+          resourceType: 'MEDICAL_ACCESS_GRANT',
+          resourceId: existing.id,
+          allowed: true,
+        },
+      })
+    }
 
     const grant = await tx.medicalAccessGrant.create({
       data: {
