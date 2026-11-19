@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+type Clinic = { id: string; name: string }
+type Doctor = { id: string; fullName: string }
 type Grant = {
   id: string
   status: 'ACTIVE' | 'REVOKED' | 'EXPIRED'
@@ -27,6 +29,12 @@ function isEffective(grant: Grant) {
 
 export default function AuthorizedDoctorsManager() {
   const [grants, setGrants] = useState<Grant[]>([])
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [clinicId, setClinicId] = useState('')
+  const [doctorId, setDoctorId] = useState('')
+  const [scope, setScope] = useState<Grant['scope']>('READ_RECORD')
+  const [grantBusy, setGrantBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -52,6 +60,51 @@ export default function AuthorizedDoctorsManager() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let active = true
+    void fetch('/api/multitenant/my-clinics', { cache: 'no-store' })
+      .then(response => { if (!response.ok) throw new Error('clinics'); return response.json() })
+      .then((data: { organizations: Clinic[] }) => { if (active) setClinics(data.organizations) })
+      .catch(() => { if (active) setError('No pudimos cargar tus clínicas.') })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    setDoctors([])
+    setDoctorId('')
+    if (clinicId) {
+      void fetch('/api/multitenant/clinic-doctors?organizationId=' + encodeURIComponent(clinicId),
+        { cache: 'no-store' })
+        .then(response => { if (!response.ok) throw new Error('doctors'); return response.json() })
+        .then((data: { doctors: Doctor[] }) => { if (active) setDoctors(data.doctors) })
+        .catch(() => { if (active) setError('No pudimos cargar los médicos.') })
+    }
+    return () => { active = false }
+  }, [clinicId])
+
+  async function authorize(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!clinicId || !doctorId || grantBusy) return
+    setGrantBusy(true)
+    setError('')
+    try {
+      const response = await fetch('/api/multitenant/my-grants/grant', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: clinicId, doctorId, scope }),
+      })
+      if (!response.ok) throw new Error('grant')
+      setDoctorId('')
+      await load()
+    } catch {
+      setError('No se pudo autorizar al médico. Comprueba si ya tiene acceso vigente.')
+    } finally {
+      setGrantBusy(false)
+    }
+  }
 
   async function revoke(grantId: string) {
     if (busyId) return
@@ -84,6 +137,35 @@ export default function AuthorizedDoctorsManager() {
           Tú decides qué médicos pueden consultar tu historial médico.
         </p>
       </div>
+      <form onSubmit={event => void authorize(event)} className="space-y-3 rounded-lg border p-4">
+        <h3 className="font-semibold">Autorizar a un médico</h3>
+        <label htmlFor="clinic-select" className="block text-sm">Clínica</label>
+        <select id="clinic-select" value={clinicId} onChange={event => setClinicId(event.target.value)}
+          required className="w-full rounded border p-2">
+          <option value="">Selecciona tu clínica</option>
+          {clinics.map(clinic => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
+        </select>
+        <label htmlFor="doctor-select" className="block text-sm">Médico</label>
+        <select id="doctor-select" value={doctorId} onChange={event => setDoctorId(event.target.value)}
+          required disabled={!clinicId} className="w-full rounded border p-2">
+          <option value="">Selecciona un médico</option>
+          {doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>)}
+        </select>
+        <label htmlFor="scope-select" className="block text-sm">¿Qué puede hacer?</label>
+        <select id="scope-select" value={scope}
+          onChange={event => setScope(event.target.value as Grant['scope'])}
+          className="w-full rounded border p-2">
+          {Object.entries(permissionLabels).map(([value, label]) =>
+            <option key={value} value={value}>{label}</option>)}
+        </select>
+        <p className="text-xs text-gray-600">
+          Solo aparecen clínicas asociadas a tu cuenta. Puedes retirar el permiso cuando quieras.
+        </p>
+        <button type="submit" disabled={!doctorId || grantBusy}
+          className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">
+          {grantBusy ? 'Guardando...' : 'Autorizar médico'}
+        </button>
+      </form>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading ? <p role="status">Cargando autorizaciones...</p> :
         grants.length === 0 ? <p>No tienes autorizaciones registradas.</p> :
