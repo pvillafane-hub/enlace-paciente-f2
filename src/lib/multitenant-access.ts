@@ -104,3 +104,21 @@ export async function recordMedicalAccessDecision(
     },
   })
 }
+
+/**
+ * Preferred entry point for medical API routes.
+ * Fail closed when the audit insert fails: no medical operation proceeds.
+ * Callers MUST use this instead of authorizeMedicalRecordAccess directly.
+ */
+export async function requireAuditedMedicalRecordAccess(args: {
+  organizationId: string
+  patientId: string
+  operation: RecordOperation
+  resourceId?: string
+}): Promise<AccessDecision> {
+  const decision = await authorizeMedicalRecordAccess(args)
+  // Audit must be persisted before returning an allow decision.
+  // A database error rejects this call; callers must not continue on error.
+  await recordMedicalAccessDecision(decision, args.operation, args.resourceId)
+  return decision
+}
