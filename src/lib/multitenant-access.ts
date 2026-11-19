@@ -107,11 +107,23 @@ async function recordMedicalAccessDecision(
   resourceId?: string,
 ): Promise<void> {
   if (!decision.actorId) return // No authenticated user to associate with the event.
+  // Unknown or forged identifiers must not violate audit foreign keys.
+  // Preserve the attempted context in the reason while keeping nullable FK fields valid.
+  const [organization, patient] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: decision.organizationId },
+      select: { id: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: decision.patientId },
+      select: { id: true },
+    }),
+  ])
   await prisma.accessAuditEvent.create({
     data: {
       actorId: decision.actorId,
-      organizationId: decision.organizationId,
-      patientId: decision.patientId,
+      organizationId: organization?.id ?? null,
+      patientId: patient?.id ?? null,
       action,
       resourceType: 'MEDICAL_RECORD',
       resourceId,
