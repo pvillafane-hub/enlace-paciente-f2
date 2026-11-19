@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 type Clinic = { id: string; name: string }
 type Doctor = { id: string; fullName: string }
@@ -84,7 +84,7 @@ export default function AuthorizedDoctorsManager() {
     return () => { active = false }
   }, [clinicId])
 
-  async function authorize(event: React.FormEvent<HTMLFormElement>) {
+  async function authorize(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!clinicId || !doctorId || grantBusy) return
     setGrantBusy(true)
