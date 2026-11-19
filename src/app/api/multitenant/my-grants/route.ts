@@ -39,8 +39,23 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Effective access also depends on current patient-clinic association.
+    const associations = await prisma.patientOrganization.findMany({
+      where: { patientId: session.userId, active: true },
+      select: { organizationId: true },
+    })
+    const activeOrganizationIds = new Set(associations.map(a => a.organizationId))
+    const now = Date.now()
+    const visibleGrants = grants.map(grant => ({
+      ...grant,
+      effective: grant.status === 'ACTIVE' &&
+        grant.organization.status === 'ACTIVE' &&
+        activeOrganizationIds.has(grant.organization.id) &&
+        (!grant.validUntil || grant.validUntil.getTime() > now),
+    }))
+
     return NextResponse.json(
-      { grants },
+      { grants: visibleGrants },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch {
