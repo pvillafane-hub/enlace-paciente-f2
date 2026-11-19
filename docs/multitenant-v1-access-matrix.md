@@ -55,3 +55,17 @@ Expected `allowed = false` for all three rows. This query intentionally checks o
 3. Existing patient/doctor document read, upload and download paths are audited and integrated.
 4. Guardian authorization and tenant lifecycle are explicitly addressed.
 5. No changes to production Neon or `main` until reviewed.
+
+
+## Positive authorization and revocation — isolated DB test (2026-11-19)
+
+A transactional SQL test used a synthetic patient, doctor B and clinic B:
+1. Created an active patient-clinic association and an ACTIVE READ_RECORD grant.
+2. Verified the active grant, association and doctor membership jointly yield `positive_access = true`.
+3. Revoked the grant by setting `status = 'REVOKED'` and `revokedAt = now()`.
+4. Verified `after_revocation_access = false`.
+5. Deactivated the temporary clinic B association after the test.
+
+The earlier attempt to create another ACTIVE grant for doctor A/clinic A was rejected by the partial unique index `MedicalAccessGrant_one_active_per_context`, because an expired-by-time grant still had database status ACTIVE. The service now transitions such a grant to EXPIRED before renewal, but **that service path has not been HTTP-tested**.
+
+**Scope:** this verifies database predicates and constraints, not authenticated application authorization or audit persistence.
