@@ -72,6 +72,15 @@ async function authorizeMedicalRecordAccess(args: {
   })
   if (!patient?.active) return deny('INACTIVE_PATIENT')
 
+  // A revoked clinic association must also stop future clinical access.
+  const patientAssociation = await prisma.patientOrganization.findUnique({
+    where: {
+      organizationId_patientId: { organizationId, patientId },
+    },
+    select: { active: true },
+  })
+  if (!patientAssociation?.active) return deny('NO_ACTIVE_PATIENT_ASSOCIATION')
+
   const grants = await prisma.medicalAccessGrant.findMany({
     where: {
       organizationId,
