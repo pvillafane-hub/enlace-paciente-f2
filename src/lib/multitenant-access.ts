@@ -8,6 +8,13 @@ import type { MedicalGrantScope } from '@prisma/client'
  * The patient owns the longitudinal record; membership alone never grants access.
  * Do not activate in production routes until migration and integration tests pass.
  */
+export class MedicalAccessDeniedError extends Error {
+  constructor(public readonly reason: string) {
+    super('MEDICAL_ACCESS_DENIED')
+    this.name = 'MedicalAccessDeniedError'
+  }
+}
+
 export type RecordOperation = 'READ_RECORD' | 'UPLOAD_DOCUMENT' | 'CATEGORIZE_DOCUMENT'
 export type AccessDecision = {
   allowed: boolean
@@ -120,5 +127,6 @@ export async function requireAuditedMedicalRecordAccess(args: {
   // Audit must be persisted before returning an allow decision.
   // A database error rejects this call; callers must not continue on error.
   await recordMedicalAccessDecision(decision, args.operation, args.resourceId)
+  if (!decision.allowed) throw new MedicalAccessDeniedError(decision.reason)
   return decision
 }
