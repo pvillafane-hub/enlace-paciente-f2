@@ -26,7 +26,7 @@ function scopeAllows(scope: MedicalGrantScope, operation: RecordOperation): bool
 }
 
 /** Always derive actorId from the validated session; never accept it from a request body. */
-export async function authorizeMedicalRecordAccess(args: {
+async function authorizeMedicalRecordAccess(args: {
   organizationId: string
   patientId: string
   operation: RecordOperation
@@ -43,9 +43,9 @@ export async function authorizeMedicalRecordAccess(args: {
 
   const actor = await prisma.user.findUnique({
     where: { id: actorId },
-    select: { active: true },
+    select: { active: true, role: true },
   })
-  if (!actor?.active) return deny('INACTIVE_ACTOR')
+  if (!actor?.active || actor.role !== 'DOCTOR') return deny('INACTIVE_OR_NON_DOCTOR_ACTOR')
 
   // Self-service access is not scoped to a clinic, but this function requires
   // a clinic context for clinician operations. Patient access uses a separate path.
@@ -85,7 +85,7 @@ export async function authorizeMedicalRecordAccess(args: {
 }
 
 /** Separate audit write to avoid hiding failed authorization behind an audit error. */
-export async function recordMedicalAccessDecision(
+async function recordMedicalAccessDecision(
   decision: AccessDecision,
   action: RecordOperation,
   resourceId?: string,
