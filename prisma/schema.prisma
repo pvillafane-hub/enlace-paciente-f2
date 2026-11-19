@@ -41,7 +41,7 @@ model User {
   bloodType   String?
   allergies   String?
   contactPhone String?
-  identityStatus String?
+  identityStatus String @default("CLEAR")
 
   // 🆕 LICENCIAS
   licenses License[]
