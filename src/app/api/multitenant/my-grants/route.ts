@@ -45,12 +45,26 @@ export async function GET() {
       select: { organizationId: true },
     })
     const activeOrganizationIds = new Set(associations.map(a => a.organizationId))
+    const memberships = await prisma.organizationMember.findMany({
+      where: {
+        organizationId: { in: [...activeOrganizationIds] },
+        userId: { in: [...new Set(grants.map(g => g.doctor.id))] },
+        role: 'DOCTOR',
+        active: true,
+        user: { active: true, role: 'DOCTOR' },
+      },
+      select: { organizationId: true, userId: true },
+    })
+    const activeDoctorContexts = new Set(
+      memberships.map(m => JSON.stringify([m.organizationId, m.userId])),
+    )
     const now = Date.now()
     const visibleGrants = grants.map(grant => ({
       ...grant,
       effective: grant.status === 'ACTIVE' &&
         grant.organization.status === 'ACTIVE' &&
         activeOrganizationIds.has(grant.organization.id) &&
+        activeDoctorContexts.has(JSON.stringify([grant.organization.id, grant.doctor.id])) &&
         (!grant.validUntil || grant.validUntil.getTime() > now),
     }))
 
