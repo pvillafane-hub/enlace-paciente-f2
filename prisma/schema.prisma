@@ -20,6 +20,7 @@ model Session {
   createdAt DateTime @default(now())
   expiresAt DateTime
   challenge String?
+  challengeExpiresAt DateTime?
 
   user User? @relation(fields: [userId], references: [id])
 }
@@ -39,6 +40,8 @@ model User {
   dateOfBirth DateTime?
   bloodType   String?
   allergies   String?
+  contactPhone String?
+  identityStatus String?
 
   // 🆕 LICENCIAS
   licenses License[]
@@ -49,6 +52,11 @@ model User {
   sessions            Session[]
   passwordResetTokens PasswordResetToken[]
   accountActivities   AccountActivity[]
+  guardianLinksAsGuardian GuardianLink[] @relation("GuardianLinksAsGuardian")
+  guardianLinksAsPatient GuardianLink[] @relation("GuardianLinksAsPatient")
+  guardianLinksRequested GuardianLink[] @relation("GuardianLinksRequested")
+  guardianLinksReviewed GuardianLink[] @relation("GuardianLinksReviewed")
+  identityReview IdentityReview? @relation("IdentityReviewUser")
 
   doctorPatients DoctorPatient[] @relation("DoctorPatients")
   patientDoctors DoctorPatient[] @relation("PatientDoctors")
@@ -102,6 +110,7 @@ model Document {
   deletedAt DateTime?
   bodyPart String?
   specialty String?
+  proxyVisible Boolean @default(true)
 
   user   User        @relation(fields: [userId], references: [id])
   shares ShareLink[]
@@ -167,6 +176,7 @@ model MedicalAccessRequest {
   doctorId  String
   patientId String
   status    RequestStatus @default(PENDING)
+  initiatedBy String @default("DOCTOR")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -362,4 +372,47 @@ model AccessAuditEvent {
   @@index([organizationId, createdAt])
   @@index([patientId, createdAt])
   @@index([actorId, createdAt])
+}
+
+// Existing Neon Fase 3 guardian relationships; CHECK constraints remain managed by SQL.
+// ACTIVE requires verification, reviewedById, reviewedAt and validUntil.
+model GuardianLink {
+  id            String @id @default(uuid())
+  guardianId    String
+  patientId     String
+  relationship  String
+  status        String @default("PENDING")
+  canUpload     Boolean @default(false)
+  verification  String?
+  requestedById String
+  reviewedById  String?
+  reviewedAt    DateTime?
+  validUntil    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  guardian    User @relation("GuardianLinksAsGuardian", fields: [guardianId], references: [id], onDelete: Restrict)
+  patient     User @relation("GuardianLinksAsPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  requestedBy User @relation("GuardianLinksRequested", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User? @relation("GuardianLinksReviewed", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@unique([guardianId, patientId])
+  @@index([guardianId, status, validUntil])
+  @@index([status, createdAt])
+}
+
+model IdentityReview {
+  id           String @id @default(uuid())
+  userId       String @unique
+  candidateIds String[]
+  doctorId     String?
+  status       String @default("PENDING")
+  reason       String?
+  reviewedById String?
+  createdAt    DateTime @default(now())
+  reviewedAt   DateTime?
+
+  user User @relation("IdentityReviewUser", fields: [userId], references: [id])
+
+  @@index([status, createdAt])
 }
