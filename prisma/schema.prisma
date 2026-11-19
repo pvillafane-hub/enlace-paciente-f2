@@ -54,8 +54,6 @@ model User {
   accountActivities   AccountActivity[]
   guardianLinksAsGuardian GuardianLink[] @relation("GuardianLinksAsGuardian")
   guardianLinksAsPatient GuardianLink[] @relation("GuardianLinksAsPatient")
-  guardianLinksRequested GuardianLink[] @relation("GuardianLinksRequested")
-  guardianLinksReviewed GuardianLink[] @relation("GuardianLinksReviewed")
   identityReview IdentityReview? @relation("IdentityReviewUser")
 
   doctorPatients DoctorPatient[] @relation("DoctorPatients")
@@ -176,7 +174,7 @@ model MedicalAccessRequest {
   doctorId  String
   patientId String
   status    RequestStatus @default(PENDING)
-  initiatedBy String @default("DOCTOR")
+  initiatedBy Role?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -393,8 +391,6 @@ model GuardianLink {
 
   guardian    User @relation("GuardianLinksAsGuardian", fields: [guardianId], references: [id], onDelete: Restrict)
   patient     User @relation("GuardianLinksAsPatient", fields: [patientId], references: [id], onDelete: Restrict)
-  requestedBy User @relation("GuardianLinksRequested", fields: [requestedById], references: [id], onDelete: Restrict)
-  reviewedBy  User? @relation("GuardianLinksReviewed", fields: [reviewedById], references: [id], onDelete: Restrict)
 
   @@unique([guardianId, patientId])
   @@index([guardianId, status, validUntil])
