@@ -25,14 +25,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
     }
 
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { id: true, name: true, status: true },
-    })
-    if (!organization || organization.status !== 'ACTIVE') {
-      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
-    }
-
     // Do not disclose another clinic's roster to unrelated patients.
     const association = await prisma.patientOrganization.findUnique({
       where: {
@@ -44,6 +36,14 @@ export async function GET(request: NextRequest) {
       select: { active: true },
     })
     if (!association?.active) {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, status: true },
+    })
+    if (!organization || organization.status !== 'ACTIVE') {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
     }
 
