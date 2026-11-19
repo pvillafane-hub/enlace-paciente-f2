@@ -59,6 +59,21 @@ export async function grantDoctorAccess(input: {
       throw new ConsentError('DOCTOR_NOT_ACTIVE_IN_ORGANIZATION')
     }
 
+    // A clinic association is administrative, not consent. Require it before
+    // allowing this patient to authorize a doctor in the clinic.
+    const patientAssociation = await tx.patientOrganization.findUnique({
+      where: {
+        organizationId_patientId: {
+          organizationId: input.organizationId,
+          patientId: input.patientId,
+        },
+      },
+      select: { active: true },
+    })
+    if (!patientAssociation?.active) {
+      throw new ConsentError('PATIENT_NOT_ASSOCIATED_WITH_ORGANIZATION')
+    }
+
     const existing = await tx.medicalAccessGrant.findFirst({
       where: {
         patientId: input.patientId,
