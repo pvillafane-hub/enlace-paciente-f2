@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof ConsentError) {
-      const status = error.code === 'PATIENT_SESSION_REQUIRED' ? 401 : 403
+      const status = error.code === 'PATIENT_SESSION_REQUIRED' ? 401 :
+        error.code === 'ACTIVE_GRANT_NOT_FOUND' || error.code === 'GRANT_CHANGED' ? 404 : 403
       return NextResponse.json({ error: 'CONSENT_NOT_AVAILABLE' }, { status })
     }
     return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 })
