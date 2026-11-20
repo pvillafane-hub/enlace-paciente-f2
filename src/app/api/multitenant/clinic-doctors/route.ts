@@ -56,7 +56,6 @@ export async function GET(request: NextRequest) {
       },
       select: { user: { select: { id: true, fullName: true } } },
       orderBy: { user: { fullName: 'asc' } },
-      take: 100,
     })
     return NextResponse.json({
       organization: { id: organization.id, name: organization.name },
