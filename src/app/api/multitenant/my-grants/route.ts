@@ -36,7 +36,7 @@ export async function GET() {
         doctor: { select: { id: true, fullName: true } },
         organization: { select: { id: true, name: true, status: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     })
 
     // Effective access also depends on current patient-clinic association.
