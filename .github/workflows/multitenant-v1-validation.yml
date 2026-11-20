@@ -12,6 +12,7 @@ on:
       - 'src/app/dashboard/multitenant/**'
       - 'src/components/multitenant/**'
       - '.github/workflows/multitenant-v1-validation.yml'
+      - 'tests/multitenant-v1/**'
   workflow_dispatch:
 
 permissions:
