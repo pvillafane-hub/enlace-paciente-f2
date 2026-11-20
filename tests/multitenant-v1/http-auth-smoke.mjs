@@ -28,15 +28,20 @@ const cases = [
   { label: 'Anonymous cannot view doctor metadata', path: '/api/multitenant/doctor/document-metadata?' + documentQuery, expected: 401 },
   { label: 'Patient can view own grants', path: '/api/multitenant/my-grants', cookie: patientCookie, expected: 200 },
   { label: 'Patient can view own clinics', path: '/api/multitenant/my-clinics', cookie: patientCookie, expected: 200 },
+  { label: 'Grant requires same-origin request', path: '/api/multitenant/my-grants/grant', method: 'POST', cookie: patientCookie, expected: 403 },
+  { label: 'Revoke requires same-origin request', path: '/api/multitenant/my-grants/revoke', method: 'POST', cookie: patientCookie, expected: 403 },
+  { label: 'Anonymous grant creation is blocked', path: '/api/multitenant/my-grants/grant', method: 'POST', origin: true, expected: 401 },
+  { label: 'Anonymous revocation is blocked', path: '/api/multitenant/my-grants/revoke', method: 'POST', origin: true, expected: 401 },
 ];
 let failed = 0;
 for (const item of cases) {
   const url = new URL(item.path, base);
   try {
     const response = await fetch(url, {
-      method: 'GET',
+      method: item.method || 'GET',
       redirect: 'manual',
-      headers: { ...(item.cookie ? { cookie: item.cookie } : {}), accept: 'application/json' },
+      headers: { ...(item.cookie ? { cookie: item.cookie } : {}), ...(item.origin ? { origin: base.origin } : {}), ...(item.method === 'POST' ? { 'content-type': 'application/json' } : {}), accept: 'application/json' },
+      ...(item.method === 'POST' ? { body: '{}' } : {}),
     });
     const pass = response.status === item.expected;
     console.log((pass ? 'PASS' : 'FAIL') + ' ' + item.label + ': HTTP ' + response.status + ' (expected ' + item.expected + ')');
