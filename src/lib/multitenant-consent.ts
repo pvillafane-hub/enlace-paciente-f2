@@ -35,7 +35,9 @@ export async function grantDoctorAccess(input: {
   await requireActivePatient(input.patientId)
   const now = new Date()
   if (input.patientId === input.doctorId) throw new ConsentError('INVALID_DOCTOR')
-  if (input.validUntil && input.validUntil <= now) throw new ConsentError('INVALID_EXPIRATION')
+  if (input.validUntil && (!Number.isFinite(input.validUntil.getTime()) || input.validUntil <= now)) {
+    throw new ConsentError('INVALID_EXPIRATION')
+  }
   if (!['READ_RECORD', 'READ_AND_UPLOAD', 'READ_UPLOAD_CATEGORIZE'].includes(input.scope)) {
     throw new ConsentError('INVALID_SCOPE')
   }
