@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
     return NextResponse.json({ error: 'JSON_REQUIRED' }, { status: 415 })
   }
+  const length = Number(request.headers.get('content-length') ?? 0)
+  if (!Number.isFinite(length) || length > 4096) {
+    return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+  }
   const session = await getValidatedSession()
   if (!session) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
 
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
   let validUntil: Date | null = null
   if (typeof data.validUntil === 'string') {
-    if (data.validUntil.length > 40 || !/^\d{4}-\d{2}-\d{2}T/.test(data.validUntil)) {
+    if (data.validUntil.length > 40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(data.validUntil)) {
       return NextResponse.json({ error: 'INVALID_EXPIRATION' }, { status: 400 })
     }
     validUntil = new Date(data.validUntil)
