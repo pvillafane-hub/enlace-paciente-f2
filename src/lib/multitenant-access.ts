@@ -73,6 +73,9 @@ async function authorizeMedicalRecordAccess(args: {
   })
   if (!patientAssociation?.active) return deny('NO_ACTIVE_PATIENT_ASSOCIATION')
 
+  const allowedScopes: MedicalGrantScope[] = operation === 'UPLOAD_DOCUMENT'
+    ? ['READ_AND_UPLOAD', 'READ_UPLOAD_CATEGORIZE']
+    : ['READ_UPLOAD_CATEGORIZE']
   const grant = await prisma.medicalAccessGrant.findFirst({
     where: {
       organizationId,
@@ -82,9 +85,7 @@ async function authorizeMedicalRecordAccess(args: {
       revokedAt: null,
       AND: [
         { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
-        ...(operation === 'READ_RECORD' ? [] : [{ scope: { in: operation === 'UPLOAD_DOCUMENT'
-          ? ['READ_AND_UPLOAD', 'READ_UPLOAD_CATEGORIZE'] as MedicalGrantScope[]
-          : ['READ_UPLOAD_CATEGORIZE'] as MedicalGrantScope[] } }]),
+        ...(operation === 'READ_RECORD' ? [] : [{ scope: { in: allowedScopes } }]),
       ],
     },
     select: { id: true },
