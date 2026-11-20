@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const organizationId = request.nextUrl.searchParams.get('organizationId')
   const documentId = request.nextUrl.searchParams.get('documentId')
-  if (!organizationId || !documentId || organizationId.length > 128 || documentId.length > 128) {
+  if (!organizationId?.trim() || !documentId?.trim() || organizationId.length > 128 || documentId.length > 128) {
     return NextResponse.json({ error: 'MISSING_PARAMETERS' }, { status: 400 })
   }
   try {
