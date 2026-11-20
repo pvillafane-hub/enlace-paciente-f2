@@ -30,6 +30,7 @@ export default function AuthorizedDoctorsManager() {
   const [doctorId, setDoctorId] = useState('')
   const [scope, setScope] = useState<Grant['scope']>('READ_RECORD')
   const [grantBusy, setGrantBusy] = useState(false)
+  const [directoryLoading, setDirectoryLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -69,12 +70,14 @@ export default function AuthorizedDoctorsManager() {
     let active = true
     setDoctors([])
     setDoctorId('')
+    setDirectoryLoading(Boolean(clinicId))
     if (clinicId) {
       void fetch('/api/multitenant/clinic-doctors?organizationId=' + encodeURIComponent(clinicId),
         { cache: 'no-store' })
         .then(response => { if (!response.ok) throw new Error('doctors'); return response.json() })
         .then((data: { doctors: Doctor[] }) => { if (active) setDoctors(data.doctors) })
         .catch(() => { if (active) setError('No pudimos cargar los médicos.') })
+        .finally(() => { if (active) setDirectoryLoading(false) })
     }
     return () => { active = false }
   }, [clinicId])
@@ -148,8 +151,8 @@ export default function AuthorizedDoctorsManager() {
         </select>
         <label htmlFor="doctor-select" className="block text-sm">Médico</label>
         <select id="doctor-select" value={doctorId} onChange={event => setDoctorId(event.target.value)}
-          required disabled={!clinicId} className="w-full rounded border p-2">
-          <option value="">Selecciona un médico</option>
+          required disabled={!clinicId || directoryLoading} className="w-full rounded border p-2">
+          <option value="">{directoryLoading ? 'Cargando médicos...' : 'Selecciona un médico'}</option>
           {doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>)}
         </select>
         <label htmlFor="scope-select" className="block text-sm">¿Qué puede hacer?</label>
@@ -162,7 +165,7 @@ export default function AuthorizedDoctorsManager() {
         <p className="text-xs text-gray-600">
           Solo aparecen clínicas asociadas a tu cuenta. Puedes retirar el permiso cuando quieras.
         </p>
-        <button type="submit" disabled={!doctorId || grantBusy}
+        <button type="submit" disabled={!doctorId || grantBusy || directoryLoading}
           className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">
           {grantBusy ? 'Guardando...' : 'Autorizar médico'}
         </button>
