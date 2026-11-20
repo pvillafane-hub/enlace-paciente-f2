@@ -84,7 +84,8 @@ export default function AuthorizedDoctorsManager() {
 
   async function authorize(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!clinicId || !doctorId || grantBusy) return
+    if (!clinicId || !doctorId || grantBusy || directoryLoading ||
+        !doctors.some(doctor => doctor.id === doctorId)) return
     setGrantBusy(true)
     setError('')
     try {
@@ -165,7 +166,7 @@ export default function AuthorizedDoctorsManager() {
         <p className="text-xs text-gray-600">
           Solo aparecen clínicas asociadas a tu cuenta. Puedes retirar el permiso cuando quieras.
         </p>
-        <button type="submit" disabled={!doctorId || grantBusy || directoryLoading}
+        <button type="submit" disabled={!doctorId || grantBusy || directoryLoading || !doctors.some(doctor => doctor.id === doctorId)}
           className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">
           {grantBusy ? 'Guardando...' : 'Autorizar médico'}
         </button>
