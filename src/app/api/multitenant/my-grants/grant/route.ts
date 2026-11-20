@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getValidatedSession } from '@/lib/auth'
+import { readBoundedJson, RequestBodyTooLargeError } from '@/lib/multitenant-request'
 import { grantDoctorAccess, ConsentError } from '@/lib/multitenant-consent'
 import { Prisma, type MedicalGrantScope } from '@prisma/client'
 
@@ -24,10 +25,11 @@ export async function POST(request: NextRequest) {
 
   let payload: unknown
   try {
-    const raw = await request.text()
-    if (Buffer.byteLength(raw, 'utf8') > 4096) return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
-    payload = JSON.parse(raw)
-  } catch {
+    payload = await readBoundedJson(request)
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+    }
     return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 })
   }
 
