@@ -91,11 +91,17 @@ export default function AuthorizedDoctorsManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organizationId: clinicId, doctorId, scope }),
       })
+      if (response.status === 409) {
+        await load()
+        throw new Error('ALREADY_GRANTED')
+      }
       if (!response.ok) throw new Error('grant')
       setDoctorId('')
       await load()
-    } catch {
-      setError('No se pudo autorizar al médico. Comprueba si ya tiene acceso vigente.')
+    } catch (err) {
+      setError(err instanceof Error && err.message === 'ALREADY_GRANTED'
+        ? 'Este médico ya tiene una autorización activa. Revisa la lista antes de intentar nuevamente.'
+        : 'No se pudo autorizar al médico. Intenta nuevamente.')
     } finally {
       setGrantBusy(false)
     }
