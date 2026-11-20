@@ -62,6 +62,7 @@ export async function GET() {
     const visibleGrants = grants.map(grant => ({
       ...grant,
       effective: grant.status === 'ACTIVE' &&
+        grant.revokedAt === null &&
         grant.organization.status === 'ACTIVE' &&
         activeOrganizationIds.has(grant.organization.id) &&
         activeDoctorContexts.has(JSON.stringify([grant.organization.id, grant.doctor.id])) &&
