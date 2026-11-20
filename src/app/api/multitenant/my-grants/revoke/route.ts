@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   let payload: unknown
   try {
     const raw = await request.text()
-    if (raw.length > 4096) {
+    if (Buffer.byteLength(raw, 'utf8') > 4096) {
       return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
     }
     payload = JSON.parse(raw)
