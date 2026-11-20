@@ -24,14 +24,6 @@ export type AccessDecision = {
   patientId: string
 }
 
-function scopeAllows(scope: MedicalGrantScope, operation: RecordOperation): boolean {
-  if (operation === 'READ_RECORD') return true
-  if (operation === 'UPLOAD_DOCUMENT') {
-    return scope === 'READ_AND_UPLOAD' || scope === 'READ_UPLOAD_CATEGORIZE'
-  }
-  return scope === 'READ_UPLOAD_CATEGORIZE'
-}
-
 /** Always derive actorId from the validated session; never accept it from a request body. */
 async function authorizeMedicalRecordAccess(args: {
   organizationId: string
@@ -81,19 +73,24 @@ async function authorizeMedicalRecordAccess(args: {
   })
   if (!patientAssociation?.active) return deny('NO_ACTIVE_PATIENT_ASSOCIATION')
 
-  const grants = await prisma.medicalAccessGrant.findMany({
+  const grant = await prisma.medicalAccessGrant.findFirst({
     where: {
       organizationId,
       patientId,
       doctorId: actorId,
       status: 'ACTIVE',
       revokedAt: null,
-      OR: [{ validUntil: null }, { validUntil: { gt: now } }],
+      AND: [
+        { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+        ...(operation === 'READ_RECORD' ? [] : [{ scope: { in: operation === 'UPLOAD_DOCUMENT'
+          ? ['READ_AND_UPLOAD', 'READ_UPLOAD_CATEGORIZE'] as MedicalGrantScope[]
+          : ['READ_UPLOAD_CATEGORIZE'] as MedicalGrantScope[] } }]),
+      ],
     },
-    select: { scope: true },
+    select: { id: true },
   })
 
-  if (!grants.some(grant => scopeAllows(grant.scope, operation))) {
+  if (!grant) {
     return deny('NO_VALID_PATIENT_GRANT')
   }
   return { allowed: true, reason: 'AUTHORIZED', actorId, organizationId, patientId }
