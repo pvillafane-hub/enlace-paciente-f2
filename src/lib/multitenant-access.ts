@@ -91,7 +91,6 @@ async function authorizeMedicalRecordAccess(args: {
       OR: [{ validUntil: null }, { validUntil: { gt: now } }],
     },
     select: { scope: true },
-    take: 2,
   })
 
   if (!grants.some(grant => scopeAllows(grant.scope, operation))) {
