@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (
     !payload || typeof payload !== 'object' || Array.isArray(payload) ||
     !('grantId' in payload) || typeof payload.grantId !== 'string' ||
-    payload.grantId.length < 1 || payload.grantId.length > 128
+    payload.grantId.trim().length < 1 || payload.grantId.length > 128
   ) {
     return NextResponse.json({ error: 'INVALID_GRANT_ID' }, { status: 400 })
   }
