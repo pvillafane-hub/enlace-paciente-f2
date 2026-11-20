@@ -85,7 +85,7 @@ export async function grantDoctorAccess(input: {
     if (existing) {
       // Expired-by-time grants remain ACTIVE in the database. Retire them
       // atomically so the partial unique index allows a fresh authorization.
-      if (!existing.validUntil || existing.validUntil > new Date()) {
+      if (existing.revokedAt || !existing.validUntil || existing.validUntil > new Date()) {
         throw new ConsentError('ALREADY_GRANTED')
       }
       await tx.medicalAccessGrant.update({
