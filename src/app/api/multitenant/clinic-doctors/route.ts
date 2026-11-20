@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   const organizationId = request.nextUrl.searchParams.get('organizationId')
-  if (!organizationId || organizationId.length > 128) {
+  if (!organizationId?.trim() || organizationId.length > 128) {
     return NextResponse.json({ error: 'INVALID_ORGANIZATION' }, { status: 400 })
   }
   try {
