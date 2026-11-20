@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getValidatedSession } from '@/lib/auth'
 import { grantDoctorAccess, ConsentError } from '@/lib/multitenant-consent'
-import type { MedicalGrantScope } from '@prisma/client'
+import { Prisma, type MedicalGrantScope } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 const scopes: MedicalGrantScope[] = ['READ_RECORD', 'READ_AND_UPLOAD', 'READ_UPLOAD_CATEGORIZE']
@@ -71,6 +71,11 @@ export async function POST(request: NextRequest) {
       },
     }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
+    // Concurrent requests may race for the same unique active authorization.
+    // Treat the database uniqueness guard as an existing permission, not a 500.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'ALREADY_GRANTED' }, { status: 409 })
+    }
     if (error instanceof ConsentError) {
       const status = error.code === 'PATIENT_SESSION_REQUIRED' ? 401 :
         error.code === 'ALREADY_GRANTED' ? 409 : 403
