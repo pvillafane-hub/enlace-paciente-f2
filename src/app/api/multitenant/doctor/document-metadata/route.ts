@@ -20,6 +20,13 @@ export async function GET(request: NextRequest) {
     // Authenticate before any document lookup, including metadata and ownership.
     const session = await getValidatedSession()
     if (!session) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
+    const actor = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { active: true, role: true },
+    })
+    if (!actor?.active || actor.role !== 'DOCTOR') {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+    }
 
     const document = await prisma.document.findUnique({
       where: { id: documentId },
