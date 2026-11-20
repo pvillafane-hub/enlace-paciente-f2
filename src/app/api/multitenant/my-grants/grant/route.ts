@@ -79,7 +79,9 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof ConsentError) {
       const status = error.code === 'PATIENT_SESSION_REQUIRED' ? 401 :
-        error.code === 'ALREADY_GRANTED' ? 409 : 403
+        error.code === 'ALREADY_GRANTED' ? 409 :
+        error.code === 'INVALID_EXPIRATION' || error.code === 'INVALID_SCOPE' ||
+        error.code === 'INVALID_DOCTOR' ? 400 : 403
       return NextResponse.json({ error: error.code }, { status })
     }
     return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 })
