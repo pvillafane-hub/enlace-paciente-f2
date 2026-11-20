@@ -150,7 +150,12 @@ export default function AuthorizedDoctorsManager() {
       <form onSubmit={event => void authorize(event)} className="space-y-3 rounded-lg border p-4">
         <h3 className="font-semibold">Autorizar a un médico</h3>
         <label htmlFor="clinic-select" className="block text-sm">Clínica</label>
-        <select id="clinic-select" value={clinicId} onChange={event => setClinicId(event.target.value)}
+        <select id="clinic-select" value={clinicId} onChange={event => {
+          setDoctors([])
+          setDoctorId('')
+          setDirectoryLoading(Boolean(event.target.value))
+          setClinicId(event.target.value)
+        }}
           required disabled={grantBusy} className="w-full rounded border p-2">
           <option value="">Selecciona tu clínica</option>
           {clinics.map(clinic => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
