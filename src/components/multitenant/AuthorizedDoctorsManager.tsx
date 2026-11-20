@@ -32,12 +32,14 @@ export default function AuthorizedDoctorsManager() {
   const [grantBusy, setGrantBusy] = useState(false)
   const [directoryLoading, setDirectoryLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadFailed(false)
     setError('')
     try {
       const response = await fetch('/api/multitenant/my-grants', {
@@ -51,6 +53,7 @@ export default function AuthorizedDoctorsManager() {
     } catch {
       // Never present cached permissions as current after a failed refresh.
       setGrants([])
+      setLoadFailed(true)
       setError('No pudimos cargar tus médicos autorizados. Intenta nuevamente.')
     } finally {
       setLoading(false)
@@ -175,6 +178,7 @@ export default function AuthorizedDoctorsManager() {
       </form>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading ? <p role="status">Cargando autorizaciones...</p> :
+        loadFailed ? <p role="status">No se pudo verificar el estado actual de tus autorizaciones.</p> :
         grants.length === 0 ? <p>No tienes autorizaciones registradas.</p> :
         <ul className="space-y-3">
           {grants.map(grant => {
