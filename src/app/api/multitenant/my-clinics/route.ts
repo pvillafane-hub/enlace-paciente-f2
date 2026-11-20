@@ -25,7 +25,7 @@ export async function GET() {
         organization: { status: 'ACTIVE' },
       },
       select: { organization: { select: { id: true, name: true } } },
-      take: 100,
+      orderBy: { organization: { name: 'asc' } },
     })
     return NextResponse.json(
       { organizations: associations.map(item => item.organization) },
