@@ -60,9 +60,9 @@ async function authorizeMedicalRecordAccess(args: {
 
   const patient = await prisma.user.findUnique({
     where: { id: patientId },
-    select: { active: true },
+    select: { active: true, role: true },
   })
-  if (!patient?.active) return deny('INACTIVE_PATIENT')
+  if (!patient?.active || patient.role !== 'PATIENT') return deny('INACTIVE_OR_NON_PATIENT_SUBJECT')
 
   // A revoked clinic association must also stop future clinical access.
   const patientAssociation = await prisma.patientOrganization.findUnique({
