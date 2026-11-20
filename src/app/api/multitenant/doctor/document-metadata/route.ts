@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getValidatedSession } from '@/lib/auth'
 import { requireAuditedMedicalRecordAccess, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'MISSING_PARAMETERS' }, { status: 400 })
   }
   try {
+    // Authenticate before any document lookup, including metadata and ownership.
+    const session = await getValidatedSession()
+    if (!session) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
+
     const document = await prisma.document.findUnique({
       where: { id: documentId },
       select: {
