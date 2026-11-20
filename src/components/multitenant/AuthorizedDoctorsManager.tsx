@@ -146,20 +146,20 @@ export default function AuthorizedDoctorsManager() {
         <h3 className="font-semibold">Autorizar a un médico</h3>
         <label htmlFor="clinic-select" className="block text-sm">Clínica</label>
         <select id="clinic-select" value={clinicId} onChange={event => setClinicId(event.target.value)}
-          required className="w-full rounded border p-2">
+          required disabled={grantBusy} className="w-full rounded border p-2">
           <option value="">Selecciona tu clínica</option>
           {clinics.map(clinic => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
         </select>
         <label htmlFor="doctor-select" className="block text-sm">Médico</label>
         <select id="doctor-select" value={doctorId} onChange={event => setDoctorId(event.target.value)}
-          required disabled={!clinicId || directoryLoading} className="w-full rounded border p-2">
+          required disabled={!clinicId || directoryLoading || grantBusy} className="w-full rounded border p-2">
           <option value="">{directoryLoading ? 'Cargando médicos...' : 'Selecciona un médico'}</option>
           {doctors.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>)}
         </select>
         <label htmlFor="scope-select" className="block text-sm">¿Qué puede hacer?</label>
         <select id="scope-select" value={scope}
           onChange={event => setScope(event.target.value as Grant['scope'])}
-          className="w-full rounded border p-2">
+          disabled={grantBusy} className="w-full rounded border p-2">
           {Object.entries(permissionLabels).map(([value, label]) =>
             <option key={value} value={value}>{label}</option>)}
         </select>
