@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 })
   }
   const data = payload as Record<string, unknown>
-  if (typeof data.doctorId !== 'string' || data.doctorId.length < 1 || data.doctorId.length > 128 ||
-      typeof data.organizationId !== 'string' || data.organizationId.length < 1 || data.organizationId.length > 128 ||
+  if (typeof data.doctorId !== 'string' || data.doctorId.trim().length < 1 || data.doctorId.length > 128 ||
+      typeof data.organizationId !== 'string' || data.organizationId.trim().length < 1 || data.organizationId.length > 128 ||
       typeof data.scope !== 'string' || !scopes.includes(data.scope as MedicalGrantScope) ||
       (data.validUntil !== undefined && data.validUntil !== null && typeof data.validUntil !== 'string') ||
       (typeof data.validUntil === 'string' && data.validUntil.length === 0)) {
