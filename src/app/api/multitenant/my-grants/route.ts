@@ -47,8 +47,8 @@ export async function GET() {
     const activeOrganizationIds = new Set(associations.map(a => a.organizationId))
     const memberships = await prisma.organizationMember.findMany({
       where: {
-        organizationId: { in: [...activeOrganizationIds] },
-        userId: { in: [...new Set(grants.map(g => g.doctor.id))] },
+        organizationId: { in: Array.from(activeOrganizationIds) },
+        userId: { in: Array.from(new Set(grants.map(g => g.doctor.id))) },
         role: 'DOCTOR',
         active: true,
         user: { active: true, role: 'DOCTOR' },
