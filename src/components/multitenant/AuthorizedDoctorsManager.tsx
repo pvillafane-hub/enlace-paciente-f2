@@ -49,6 +49,8 @@ export default function AuthorizedDoctorsManager() {
       if (!Array.isArray(data.grants)) throw new Error('Respuesta inesperada.')
       setGrants(data.grants)
     } catch {
+      // Never present cached permissions as current after a failed refresh.
+      setGrants([])
       setError('No pudimos cargar tus médicos autorizados. Intenta nuevamente.')
     } finally {
       setLoading(false)
