@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
   if (typeof data.doctorId !== 'string' || data.doctorId.length < 1 || data.doctorId.length > 128 ||
       typeof data.organizationId !== 'string' || data.organizationId.length < 1 || data.organizationId.length > 128 ||
       typeof data.scope !== 'string' || !scopes.includes(data.scope as MedicalGrantScope) ||
-      (data.validUntil !== undefined && data.validUntil !== null && typeof data.validUntil !== 'string')) {
+      (data.validUntil !== undefined && data.validUntil !== null && typeof data.validUntil !== 'string') ||
+      (typeof data.validUntil === 'string' && data.validUntil.length === 0)) {
     return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 })
   }
   let validUntil: Date | null = null
