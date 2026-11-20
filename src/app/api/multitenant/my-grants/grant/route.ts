@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'INVALID_EXPIRATION' }, { status: 400 })
     }
     validUntil = new Date(data.validUntil)
-    if (Number.isNaN(validUntil.getTime())) {
+    if (Number.isNaN(validUntil.getTime()) || validUntil.getTime() <= Date.now()) {
       return NextResponse.json({ error: 'INVALID_EXPIRATION' }, { status: 400 })
     }
   }
