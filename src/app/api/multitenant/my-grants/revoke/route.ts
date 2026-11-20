@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getValidatedSession } from '@/lib/auth'
+import { readBoundedJson, RequestBodyTooLargeError } from '@/lib/multitenant-request'
 import { revokeDoctorAccess, ConsentError } from '@/lib/multitenant-consent'
 
 export const dynamic = 'force-dynamic'
@@ -29,12 +30,11 @@ export async function POST(request: NextRequest) {
 
   let payload: unknown
   try {
-    const raw = await request.text()
-    if (Buffer.byteLength(raw, 'utf8') > 4096) {
+    payload = await readBoundedJson(request)
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
       return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
     }
-    payload = JSON.parse(raw)
-  } catch {
     return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 })
   }
   if (
