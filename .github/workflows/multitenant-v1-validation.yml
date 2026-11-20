@@ -1,0 +1,41 @@
+name: Multi-Tenant V1 validation
+
+on:
+  push:
+    branches:
+      - feature/multitenant-v1
+  pull_request:
+    paths:
+      - 'prisma/schema.prisma'
+      - 'src/lib/multitenant-*.ts'
+      - 'src/app/api/multitenant/**'
+      - 'src/app/dashboard/multitenant/**'
+      - 'src/components/multitenant/**'
+      - '.github/workflows/multitenant-v1-validation.yml'
+      - 'tests/multitenant-v1/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
