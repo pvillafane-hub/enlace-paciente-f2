@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'JSON_REQUIRED' }, { status: 415 })
   }
   const length = Number(request.headers.get('content-length') ?? 0)
-  if (!Number.isFinite(length) || length > 4096) {
+  if (!Number.isFinite(length) || length < 0 || length > 4096) {
     return NextResponse.json({ error: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
   }
 
