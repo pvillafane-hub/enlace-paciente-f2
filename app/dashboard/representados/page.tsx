@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
-import { getAuthorizedMinorProxy } from '@/lib/guardian-proxy-access'
+import { getAuthorizedProxy } from '@/lib/guardian-proxy-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,12 +28,12 @@ export default async function RepresentadosPage() {
   }))
   return <main className="mx-auto max-w-4xl space-y-6 p-5">
     <h1 className="text-3xl font-bold">Mis representados</h1>
-    <p className="text-gray-700">Consulta únicamente documentos autorizados de menores bajo tu representación verificada. Los expedientes de adultos requieren una validación legal independiente.</p>
+    <p className="text-gray-700">Consulta documentos habilitados para representantes. Los pacientes adultos deben confirmar expresamente su consentimiento desde su cuenta.</p>
     <Link className="text-blue-700 underline" href="/dashboard">Volver a mi expediente</Link>
     {!entries.length && <p className="rounded-xl border bg-white p-5">No tienes representados registrados.</p>}
     {entries.map(({ link, authorized, documents }) => <section key={link.id} className="rounded-xl border bg-white p-5 space-y-3">
       <h2 className="text-xl font-semibold">{link.patient.fullName}</h2>
-      {!authorized ? <p className="text-amber-800">Acceso no disponible. El vínculo puede estar pendiente, revocado, vencido o corresponder a una persona adulta. Consulta con administración para verificar su situación.</p> :
+      {!authorized ? <p className="text-amber-800">Acceso no disponible. El vínculo puede estar pendiente, revocado o vencido, o el paciente adulto todavía no ha confirmado su consentimiento.</p> :
         <><p className="text-green-800">Representación verificada y vigente · documentos compartibles</p>
           {!documents.length && <p>No hay documentos habilitados para representantes.</p>}
           <ul className="space-y-2">{documents.map(doc => <li key={doc.id} className="rounded-lg border p-3">

@@ -59,6 +59,7 @@ export default function MobileMenu({
             {!isDoctor && !isAdmin && (
               <>
                 <Link href="/dashboard/representados" onClick={() => setOpen(false)}>Mis representados</Link>
+                <Link href="/dashboard/mis-representantes" onClick={() => setOpen(false)}>Mis autorizaciones</Link>
                 <Link href="/dashboard/multitenant/mis-medicos" onClick={() => setOpen(false)}>Mis doctores</Link>
                 <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>
               </>
