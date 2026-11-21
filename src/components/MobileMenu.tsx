@@ -45,7 +45,7 @@ export default function MobileMenu({
           />
 
           {/* PANEL */}
-          <div className="absolute left-0 top-0 h-full w-64 bg-white p-6 flex flex-col gap-6 shadow-xl">
+          <div className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto bg-white p-6 flex flex-col gap-5 shadow-xl">
 
             <button
               onClick={() => setOpen(false)}
@@ -79,6 +79,8 @@ export default function MobileMenu({
                 <Link href="/dashboard/admin/licenses" onClick={() => setOpen(false)}>Licencias</Link>
                 <Link href="/dashboard/admin/guardians" onClick={() => setOpen(false)}>Padres y tutores</Link>
                 <Link href="/dashboard/admin/identity" onClick={() => setOpen(false)}>Identidad</Link>
+                <Link href="/dashboard/admin/interoperability" onClick={() => setOpen(false)}>Interoperabilidad</Link>
+                <Link href="/dashboard/admin/integrations" onClick={() => setOpen(false)}>Integraciones</Link>
                 <Link href="/dashboard/admin/users" onClick={() => setOpen(false)}>Usuarios</Link>
                 <Link href="/dashboard/admin/logs" onClick={() => setOpen(false)}>Logs</Link>
                 <Link href="/dashboard/admin/alerts" onClick={() => setOpen(false)}>Alertas</Link>
