@@ -150,7 +150,7 @@ export default function DocumentSearch({ documents, allowCategoryEdit = false }:
                 editingId === doc.id ? <div className="flex flex-col gap-2">
                   <label htmlFor={'category-' + doc.id} className="text-sm font-semibold">Categoría del estudio</label>
                   <select id={'category-' + doc.id} value={category} onChange={e => setCategory(e.target.value)} className="rounded border p-2">
-                    {[...new Set([doc.docType, ...categories])].map(value => <option key={value} value={value}>{value}</option>)}
+                    {[doc.docType, ...categories.filter(value => value !== doc.docType)].map(value => <option key={value} value={value}>{value}</option>)}
                   </select>
                   <button type="button" disabled={saving} onClick={() => saveCategory(doc.id)} className="rounded bg-green-700 px-3 py-2 text-white disabled:opacity-50">Guardar</button>
                   <button type="button" disabled={saving} onClick={() => setEditingId(null)} className="rounded border px-3 py-2">Cancelar</button>
