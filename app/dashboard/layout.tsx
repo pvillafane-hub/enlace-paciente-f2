@@ -94,7 +94,7 @@ export default async function DashboardLayout({
 
             {!isDoctor && !isAdmin && (
               <>
-                <Link href="/dashboard/doctors">
+                <Link href="/dashboard/multitenant/mis-medicos">
                   Mis doctores
                 </Link>
 
