@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const { dateOfBirth, bloodType, allergies, medicalConditions, surgeries } = body
-    if ([medicalConditions, surgeries].some(value => typeof value !== 'string' || value.length > 10000)) {
+    if ([allergies, medicalConditions, surgeries].some(value => typeof value !== 'string' || value.length > 10000)) {
       return NextResponse.json({ error: 'Información médica inválida' }, { status: 400 })
     }
     const account = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, active: true } })
