@@ -75,6 +75,8 @@ export default function MobileMenu({
               <>
                 <Link href="/dashboard/admin/clinics" onClick={() => setOpen(false)}>Onboard Clinic</Link>
                 <Link href="/dashboard/admin/licenses" onClick={() => setOpen(false)}>Licencias</Link>
+                <Link href="/dashboard/admin/guardians" onClick={() => setOpen(false)}>Padres y tutores</Link>
+                <Link href="/dashboard/admin/identity" onClick={() => setOpen(false)}>Identidad</Link>
                 <Link href="/dashboard/admin/users" onClick={() => setOpen(false)}>Usuarios</Link>
                 <Link href="/dashboard/admin/logs" onClick={() => setOpen(false)}>Logs</Link>
                 <Link href="/dashboard/admin/alerts" onClick={() => setOpen(false)}>Alertas</Link>

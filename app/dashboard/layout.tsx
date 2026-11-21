@@ -132,6 +132,8 @@ export default async function DashboardLayout({
               <>
                 <Link href="/dashboard/admin/clinics">Onboard Clinic</Link>
                 <Link href="/dashboard/admin/licenses">Licencias</Link>
+                <Link href="/dashboard/admin/guardians">Padres y tutores</Link>
+                <Link href="/dashboard/admin/identity">Identidad</Link>
                 <Link href="/dashboard/admin/users">
                   Usuarios
                 </Link>
