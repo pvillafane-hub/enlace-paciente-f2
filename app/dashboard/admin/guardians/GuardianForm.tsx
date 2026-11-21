@@ -19,8 +19,6 @@ export default function GuardianForm({ action, message, children }: { action: (s
     if (data.get('status') === 'ACTIVE') {
       const required = [
         ['authorityVerified', 'Marca la verificación de identidad y autoridad del representante.'],
-        ['minorVerified', 'Marca la confirmación de que el paciente es menor.'],
-        ['validUntil', 'Selecciona una fecha de vencimiento o próxima revisión.'],
       ]
       for (const [name, error] of required) {
         const input = element.elements.namedItem(name)

@@ -10,10 +10,9 @@ export function guardianDecision(data: FormData, now = new Date()) {
   if (!['ACTIVE','REVOKED'].includes(status)) throw new Error('Estado inválido.')
   if (status === 'REVOKED') return { status, reason, canUpload: false, validUntil: null, relationship: typeof relationship === 'string' ? relationship : undefined }
   if (data.get('authorityVerified') !== 'on') throw new Error('Marca la verificación de identidad y autoridad del representante.')
-  if (data.get('minorVerified') !== 'on') throw new Error('Marca la confirmación de que el paciente es menor.')
   const date = data.get('validUntil')
-  if (!validDateOnly(date)) throw new Error('Indica una fecha de vencimiento para revisar el vínculo.')
-  const validUntil = new Date(date + 'T23:59:59.999-04:00')
-  if (validUntil <= now) throw new Error('El vencimiento debe ser futuro.')
+  if (date && !validDateOnly(date)) throw new Error('La fecha opcional no es válida.')
+  const validUntil = date ? new Date(String(date) + 'T23:59:59.999-04:00') : null
+  if (validUntil && validUntil <= now) throw new Error('El vencimiento debe ser futuro.')
   return { status, reason, validUntil, relationship: typeof relationship === 'string' ? relationship : undefined, canUpload: data.get('canUpload') === 'on' }
 }
