@@ -27,13 +27,13 @@ export default async function PatientPage({
     where: { id: session.userId }
   })
 
-  if (!user) {
+  if (!user?.active) {
     redirect('/dashboard')
   }
 
   const isDoctor = user.role === "DOCTOR"
   const isStaff = user.role === "STAFF"
-  const isDemo = user.email === "doctor_demo@enlace.com"
+  const isDemo = user.email === "doctor_demo@enlace.com" && process.env.ENLACE_ISOLATED_ENVIRONMENT === "true" && ["1", "2", "3"].includes(patientId)
 
   let doctorId = user.id
 
