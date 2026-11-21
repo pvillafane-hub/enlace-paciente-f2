@@ -131,6 +131,7 @@ export default async function DashboardLayout({
             {isAdmin && (
               <>
                 <Link href="/dashboard/admin/clinics">Onboard Clinic</Link>
+                <Link href="/dashboard/admin/licenses">Licencias</Link>
                 <Link href="/dashboard/admin/users">
                   Usuarios
                 </Link>
