@@ -3,6 +3,7 @@ import DocumentSearch from '@/components/DocumentSearch'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { requireAuditedMedicalRecordAccessForActor, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 export default async function PatientPage({
   params,
@@ -26,13 +27,13 @@ export default async function PatientPage({
     where: { id: session.userId }
   })
 
-  if (!user) {
+  if (!user?.active) {
     redirect('/dashboard')
   }
 
   const isDoctor = user.role === "DOCTOR"
   const isStaff = user.role === "STAFF"
-  const isDemo = user.email === "doctor_demo@enlace.com"
+  const isDemo = user.email === "doctor_demo@enlace.com" && process.env.ENLACE_ISOLATED_ENVIRONMENT === "true" && ["1", "2", "3"].includes(patientId)
 
   let doctorId = user.id
 
@@ -56,24 +57,28 @@ export default async function PatientPage({
   }
 
   if (!isDemo) {
-    const access = await prisma.doctorPatient.findFirst({
-      where: { doctorId, patientId }
+    // Multi-Tenant V1: legacy DoctorPatient and ClinicStaff records are not consent.
+    if (isStaff) redirect('/dashboard')
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId: user.id, active: true, role: 'DOCTOR', organization: { status: 'ACTIVE' } },
+      select: { organizationId: true },
     })
-
-    if (!access) {
-      redirect('/dashboard')
-    }
-
-    await prisma.medicalAlert.updateMany({
-      where: {
-        doctorId,
-        patientId,
-        resolved: false
-      },
-      data: {
-        resolved: true,
-        resolvedAt: new Date()
+    let authorized = false
+    for (const member of memberships) {
+      try {
+        await requireAuditedMedicalRecordAccessForActor({
+          actorId: user.id, organizationId: member.organizationId, patientId, operation: 'READ_RECORD',
+        })
+        authorized = true
+        break
+      } catch (error) {
+        if (!(error instanceof MedicalAccessDeniedError)) throw error
       }
+    }
+    if (!authorized) redirect('/dashboard')
+    await prisma.medicalAlert.updateMany({
+      where: { doctorId, patientId, resolved: false },
+      data: { resolved: true, resolvedAt: new Date() },
     })
   }
 
@@ -164,7 +169,7 @@ export default async function PatientPage({
       documents: realPatient.documents.map(doc => ({
         ...doc,
         studyDate: new Date(doc.studyDate),
-        deletedAt: null
+        deletedAt: doc.deletedAt
       }))
     }
   }
@@ -306,6 +311,7 @@ export default async function PatientPage({
         <h2 className="text-xl font-semibold mb-6">Historial médico</h2>
 
         <DocumentSearch
+          allowCategoryEdit={isDoctor && !isDemo}
           documents={patient.documents.map((doc: any) => ({
             ...doc,
             studyDate:

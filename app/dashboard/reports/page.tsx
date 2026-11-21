@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import ActivitySearch from "./ActivitySearch"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export const dynamic = "force-dynamic"
 
@@ -17,18 +18,28 @@ export default async function ReportsPage() {
     where: { id: session.userId }
   })
 
-  if (!doctor || doctor.role !== "DOCTOR") {
+  if (!doctor?.active || doctor.role !== "DOCTOR") {
     redirect("/dashboard")
   }
 
-  const patients = await prisma.doctorPatient.findMany({
-    where: {
-      doctorId: doctor.id
-    },
-    include: {
-      patient: true
-    }
+  const grants = await prisma.medicalAccessGrant.findMany({
+    where: { doctorId: doctor.id, status: 'ACTIVE', revokedAt: null, OR: [{ validUntil: null }, { validUntil: { gt: new Date() } }], organization: { status: 'ACTIVE' }, patient: { active: true } },
+    select: { patientId: true },
+    distinct: ['patientId'],
   })
+  const legacyPatients = (await prisma.user.findMany({
+    where: { id: { in: grants.map(g => g.patientId) }, role: 'PATIENT', active: true },
+  })).map(patient => ({ id: patient.id, patientId: patient.id, patient }))
+
+  const patients = (await Promise.all(legacyPatients.map(async p => {
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: doctor.id, patientId: p.patientId, operation: 'READ_RECORD' })
+      return p
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) return null
+      throw error
+    }
+  }))).filter((p): p is NonNullable<typeof p> => p !== null)
 
   const patientIds = patients.map(p => p.patientId)
 
@@ -36,7 +47,7 @@ export default async function ReportsPage() {
     where: {
       userId: {
         in: patientIds
-      }
+      }, deletedAt: null
     },
     include: {
       user: true
@@ -52,7 +63,7 @@ export default async function ReportsPage() {
     where: {
       userId: {
         in: patientIds
-      }
+      }, deletedAt: null
     },
     _count: true
   })
@@ -68,7 +79,7 @@ export default async function ReportsPage() {
   const activity = await prisma.document.groupBy({
     by: ["userId"],
     where: {
-      userId: { in: patientIds }
+      userId: { in: patientIds }, deletedAt: null
     },
     _max: {
       createdAt: true

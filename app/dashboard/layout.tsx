@@ -84,7 +84,7 @@ export default async function DashboardLayout({
           </Link>
 
           {/* 🔥 DESKTOP MENU */}
-          <div className="hidden md:flex items-center gap-8 text-lg">
+          <div className="hidden md:flex items-center gap-4 text-base">
 
             {!isAdmin && (
               <Link href="/dashboard">
@@ -94,7 +94,10 @@ export default async function DashboardLayout({
 
             {!isDoctor && !isAdmin && (
               <>
-                <Link href="/dashboard/doctors">
+                <Link href="/dashboard/profile" className="font-semibold text-blue-700">Mi información</Link>
+                <Link href="/dashboard/representados">Mis representados</Link>
+                <Link href="/dashboard/mis-representantes">Mis autorizaciones</Link>
+                <Link href="/dashboard/multitenant/mis-medicos">
                   Mis doctores
                 </Link>
 
@@ -129,19 +132,22 @@ export default async function DashboardLayout({
             )}
 
             {isAdmin && (
-              <>
-                <Link href="/dashboard/admin/users">
-                  Usuarios
-                </Link>
-
-                <Link href="/dashboard/admin/logs">
-                  Logs
-                </Link>
-
-                <Link href="/dashboard/admin/alerts">
-                  Alertas
-                </Link>
-              </>
+              <details className="group relative">
+                <summary className="cursor-pointer list-none rounded-lg px-4 py-2 font-semibold text-slate-700 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
+                  Administración <span aria-hidden="true" className="ml-1 text-sm">▾</span>
+                </summary>
+                <div className="absolute right-0 top-full z-50 mt-2 grid w-64 gap-1 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl">
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/clinics">Clínicas</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/licenses">Licencias</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/guardians">Padres y tutores</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/identity">Identidad</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/interoperability">Interoperabilidad</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/integrations">Integraciones</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/users">Usuarios</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/logs">Logs</Link>
+                  <Link className="rounded-lg px-3 py-2 hover:bg-blue-50" href="/dashboard/admin/alerts">Alertas</Link>
+                </div>
+              </details>
             )}
 
             {isDoctor && <NotificationBell alerts={alerts} />}

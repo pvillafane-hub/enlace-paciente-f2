@@ -45,7 +45,7 @@ export default function MobileMenu({
           />
 
           {/* PANEL */}
-          <div className="absolute left-0 top-0 h-full w-64 bg-white p-6 flex flex-col gap-6 shadow-xl">
+          <div className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto bg-white p-6 flex flex-col gap-5 shadow-xl">
 
             <button
               onClick={() => setOpen(false)}
@@ -58,7 +58,10 @@ export default function MobileMenu({
 
             {!isDoctor && !isAdmin && (
               <>
-                <Link href="/dashboard/doctors" onClick={() => setOpen(false)}>Mis doctores</Link>
+                <Link href="/dashboard/profile" onClick={() => setOpen(false)}>Mi información</Link>
+                <Link href="/dashboard/representados" onClick={() => setOpen(false)}>Mis representados</Link>
+                <Link href="/dashboard/mis-representantes" onClick={() => setOpen(false)}>Mis autorizaciones</Link>
+                <Link href="/dashboard/multitenant/mis-medicos" onClick={() => setOpen(false)}>Mis doctores</Link>
                 <Link href="/dashboard/security" onClick={() => setOpen(false)}>Seguridad</Link>
               </>
             )}
@@ -73,6 +76,12 @@ export default function MobileMenu({
 
             {isAdmin && (
               <>
+                <Link href="/dashboard/admin/clinics" onClick={() => setOpen(false)}>Onboard Clinic</Link>
+                <Link href="/dashboard/admin/licenses" onClick={() => setOpen(false)}>Licencias</Link>
+                <Link href="/dashboard/admin/guardians" onClick={() => setOpen(false)}>Padres y tutores</Link>
+                <Link href="/dashboard/admin/identity" onClick={() => setOpen(false)}>Identidad</Link>
+                <Link href="/dashboard/admin/interoperability" onClick={() => setOpen(false)}>Interoperabilidad</Link>
+                <Link href="/dashboard/admin/integrations" onClick={() => setOpen(false)}>Integraciones</Link>
                 <Link href="/dashboard/admin/users" onClick={() => setOpen(false)}>Usuarios</Link>
                 <Link href="/dashboard/admin/logs" onClick={() => setOpen(false)}>Logs</Link>
                 <Link href="/dashboard/admin/alerts" onClick={() => setOpen(false)}>Alertas</Link>

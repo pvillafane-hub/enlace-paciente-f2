@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export default async function MedicationsPage({
   params
@@ -19,6 +20,18 @@ export default async function MedicationsPage({
 
   if (!patientId) {
     redirect("/dashboard")
+  }
+
+  const actor = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true, active: true } })
+  if (!actor?.active) redirect('/dashboard')
+  if (actor.role !== 'PATIENT' || session.userId !== patientId) {
+    if (actor.role !== 'DOCTOR') redirect('/dashboard')
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: session.userId, patientId, operation: 'READ_RECORD' })
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) redirect('/dashboard')
+      throw error
+    }
   }
 
   const patient = await prisma.user.findUnique({

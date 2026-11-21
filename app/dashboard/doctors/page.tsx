@@ -5,6 +5,7 @@ import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { revokeAccess, inviteDoctor } from "./actions"
 import { getUserLicense } from "@/lib/license"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +24,7 @@ export default async function DoctorsPage() {
     where: { id: userId }
   })
 
-  if (!user) {
+  if (!user?.active) {
     redirect("/")
   }
 
@@ -34,6 +35,7 @@ export default async function DoctorsPage() {
   // 🧑‍🦱 PACIENTE
   // ===================================================
   if (!isDoctor) {
+    if (user.role !== "PATIENT") redirect("/dashboard")
 
     const doctors = await prisma.doctorPatient.findMany({
       where: { patientId: userId },
@@ -46,6 +48,8 @@ export default async function DoctorsPage() {
         <h1 className="text-2xl font-bold">
           Gestión de acceso médico
         </h1>
+        <Link href="/dashboard/multitenant/mis-medicos" className="inline-block rounded-lg bg-blue-700 px-5 py-3 text-white font-semibold">Administrar autorizaciones por clínica</Link>
+        <p className="text-sm text-amber-700">Las relaciones antiguas que aparecen abajo no constituyen autorización clínica Multi-Tenant. Utiliza la gestión por clínica para conceder o revocar acceso efectivo.</p>
 
         {/* 🔥 NUEVO: INVITAR DOCTOR */}
         <div className="bg-white border rounded-xl p-6">
@@ -91,12 +95,12 @@ export default async function DoctorsPage() {
         {/* DOCTORES CON ACCESO */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
-            Doctores con acceso
+            Relaciones médicas anteriores
           </h2>
 
           {doctors.length === 0 && (
             <p className="text-gray-500">
-              No tienes doctores con acceso todavía.
+              No hay relaciones anteriores registradas.
             </p>
           )}
 
@@ -121,7 +125,7 @@ export default async function DoctorsPage() {
                   <form action={revokeAccess}>
                     <input type="hidden" name="doctorId" value={d.doctor.id} />
                     <button className="text-red-600 text-sm">
-                      Revocar acceso
+                      Eliminar relación anterior
                     </button>
                   </form>
                 </div>
@@ -139,7 +143,7 @@ export default async function DoctorsPage() {
   // 👨‍⚕️ DOCTOR
   // ===================================================
 
-  const patientsData = await prisma.doctorPatient.findMany({
+  const legacyPatients = await prisma.doctorPatient.findMany({
     where: { doctorId: userId },
     include: {
       patient: {
@@ -153,6 +157,16 @@ export default async function DoctorsPage() {
       }
     }
   })
+
+  const patientsData = (await Promise.all(legacyPatients.map(async p => {
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: userId, patientId: p.patientId, operation: 'READ_RECORD' })
+      return p
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) return null
+      throw error
+    }
+  }))).filter((p): p is NonNullable<typeof p> => p !== null)
 
   return (
     <div className="max-w-6xl mx-auto space-y-10">

@@ -1,8 +1,10 @@
+import { getAuthorizedProxy } from '@/lib/guardian-proxy-access'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { s3 } from "@/lib/s3"
 import { GetObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export default async function handler(
   req: NextApiRequest,
@@ -41,6 +43,8 @@ export default async function handler(
     }
 
     const userId = session.userId
+    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, active: true, passwordChangedAt: true } })
+    if (!actor?.active || (actor.passwordChangedAt && session.createdAt < actor.passwordChangedAt)) return res.status(401).json({ error: "Sesión inválida" })
 
     // 📄 VALIDAR ID
     let id = req.query.id
@@ -58,7 +62,7 @@ export default async function handler(
       where: { id }
     })
 
-    if (!document) {
+    if (!document || document.deletedAt) {
       return res.status(404).json({ error: "Documento no encontrado" })
     }
 
@@ -73,21 +77,23 @@ export default async function handler(
     const isOwner = document.userId === userId
 
     if (!isOwner) {
-      const relation = await prisma.doctorPatient.findFirst({
-        where: {
-          doctorId: userId,
-          patientId: document.userId
+      if (actor.role === 'PATIENT') {
+        const proxy = document.proxyVisible ? await getAuthorizedProxy(userId, document.userId) : null
+        if (!proxy) return res.status(404).json({ error: "Documento no encontrado" })
+        await prisma.auditLog.create({ data: {
+          userId, action: 'GUARDIAN_DOCUMENT_VIEW', entityId: document.id,
+          metadata: { patientId: document.userId, guardianLinkId: proxy.id },
+        } })
+      } else if (actor.role === 'DOCTOR') {
+        try {
+          await requireAuditedDoctorAccessForActor({
+            actorId: userId, patientId: document.userId, operation: 'READ_RECORD', resourceId: document.id,
+          })
+        } catch (error) {
+          if (error instanceof MedicalAccessDeniedError) return res.status(404).json({ error: "Documento no encontrado" })
+          throw error
         }
-      })
-
-      if (!relation) {
-        console.warn("ACCESS DENIED:", {
-          userId,
-          documentId: id,
-        })
-
-        return res.status(403).json({ error: "Acceso denegado" })
-      }
+      } else return res.status(404).json({ error: "Documento no encontrado" })
     }
 
     // ☁️ GENERAR SIGNED URL

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 export default async function ClinicPage() {
 
@@ -17,16 +18,27 @@ export default async function ClinicPage() {
   }
 
   const doctorId = session.userId
+  const actor = await prisma.user.findUnique({ where: { id: doctorId }, select: { active: true, role: true } })
+  if (!actor?.active || actor.role !== 'DOCTOR') redirect('/dashboard')
 
-  const patients = await prisma.doctorPatient.findMany({
-    where: { doctorId },
-    include: {
-      patient: true
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
+  const grants = await prisma.medicalAccessGrant.findMany({
+    where: { doctorId, status: 'ACTIVE', revokedAt: null, OR: [{ validUntil: null }, { validUntil: { gt: new Date() } }], organization: { status: 'ACTIVE' }, patient: { active: true } },
+    select: { patientId: true },
+    distinct: ['patientId'],
   })
+  const legacyPatients = (await prisma.user.findMany({
+    where: { id: { in: grants.map(g => g.patientId) }, role: 'PATIENT', active: true },
+  })).map(patient => ({ id: patient.id, patientId: patient.id, patient }))
+
+  const patients = (await Promise.all(legacyPatients.map(async p => {
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: doctorId, patientId: p.patientId, operation: 'READ_RECORD' })
+      return p
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) return null
+      throw error
+    }
+  }))).filter((p): p is NonNullable<typeof p> => p !== null)
 
   return (
 
