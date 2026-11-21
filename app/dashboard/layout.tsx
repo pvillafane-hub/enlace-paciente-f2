@@ -136,6 +136,8 @@ export default async function DashboardLayout({
                 <Link href="/dashboard/admin/licenses">Licencias</Link>
                 <Link href="/dashboard/admin/guardians">Padres y tutores</Link>
                 <Link href="/dashboard/admin/identity">Identidad</Link>
+                <Link href="/dashboard/admin/interoperability">Interoperabilidad</Link>
+                <Link href="/dashboard/admin/integrations">Integraciones</Link>
                 <Link href="/dashboard/admin/users">
                   Usuarios
                 </Link>
