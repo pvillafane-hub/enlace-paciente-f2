@@ -18,7 +18,7 @@ export default async function RepresentadosPage() {
     take: 50,
   })
   const entries = await Promise.all(links.map(async link => {
-    const authorized = await getAuthorizedMinorProxy(session.userId, link.patientId)
+    const authorized = await getAuthorizedProxy(session.userId, link.patientId)
     const documents = authorized ? await prisma.document.findMany({
       where: { userId: link.patientId, deletedAt: null, proxyVisible: true },
       select: { id: true, filename: true, docType: true, studyDate: true },
