@@ -3,6 +3,8 @@ import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import QRScannerClient from './QRScannerClient'
+import Link from 'next/link'
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 // ==============================
 // 🔐 SERVER ACTION
@@ -23,7 +25,7 @@ async function requestAccess(formData: FormData) {
     where: { id: doctorId }
   })
 
-  if (!doctor || doctor.role !== 'DOCTOR') {
+  if (!doctor?.active || doctor.role !== 'DOCTOR') {
     throw new Error("Unauthorized")
   }
 
@@ -37,18 +39,16 @@ async function requestAccess(formData: FormData) {
     where: { email }
   })
 
-  if (!patient || patient.role !== 'PATIENT') {
+  if (!patient?.active || patient.role !== 'PATIENT') {
     return
   }
 
-  const alreadyAuthorized = await prisma.doctorPatient.findFirst({
-    where: {
-      doctorId,
-      patientId: patient.id
-    }
-  })
-
-  if (alreadyAuthorized) return
+  try {
+    await requireAuditedDoctorAccessForActor({ actorId: doctorId, patientId: patient.id, operation: 'READ_RECORD' })
+    return
+  } catch (error) {
+    if (!(error instanceof MedicalAccessDeniedError)) throw error
+  }
 
   const existingRequest = await prisma.medicalAccessRequest.findFirst({
     where: {
@@ -85,7 +85,7 @@ export default async function RequestAccessPage() {
     where: { id: session.userId }
   })
 
-  if (!user || user.role !== 'DOCTOR') {
+  if (!user?.active || user.role !== 'DOCTOR') {
     redirect('/dashboard')
   }
 
@@ -100,6 +100,25 @@ export default async function RequestAccessPage() {
       createdAt: 'desc'
     }
   })
+
+  const grants = await prisma.medicalAccessGrant.findMany({
+    where: {
+      doctorId: user.id, status: 'ACTIVE', revokedAt: null,
+      OR: [{ validUntil: null }, { validUntil: { gt: new Date() } }],
+      organization: { status: 'ACTIVE' }, patient: { active: true },
+    },
+    select: { patientId: true, patient: { select: { fullName: true, email: true } } },
+    distinct: ['patientId'],
+  })
+  const authorized = (await Promise.all(grants.map(async grant => {
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: user.id, patientId: grant.patientId, operation: 'READ_RECORD' })
+      return grant
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) return null
+      throw error
+    }
+  }))).filter((grant): grant is NonNullable<typeof grant> => grant !== null)
 
   return (
 
@@ -166,15 +185,21 @@ export default async function RequestAccessPage() {
           Pacientes con acceso autorizado
         </h2>
 
-        {requests.length === 0 && (
+        {authorized.length === 0 && requests.length === 0 && (
           <p className="text-gray-500">
-            No hay pacientes con acceso autorizado.
+            No hay autorizaciones ni solicitudes pendientes.
           </p>
         )}
 
         <div className="space-y-4">
 
-          {requests.map((req: any) => (
+          {authorized.map(grant => (
+            <div key={grant.patientId} className="border rounded-lg p-4 flex justify-between items-center gap-4">
+              <div><p className="font-semibold">{grant.patient.fullName}</p><p className="text-sm text-gray-500">{grant.patient.email}</p></div>
+              <div className="flex items-center gap-3"><span className="text-sm text-green-700 font-semibold">Acceso autorizado</span><Link className="text-sm text-blue-700 underline" href={`/dashboard/patients/${grant.patientId}`}>Ver expediente</Link></div>
+            </div>
+          ))}
+          {requests.filter(req => req.status === 'PENDING').map((req: any) => (
 
             <div
               key={req.id}
