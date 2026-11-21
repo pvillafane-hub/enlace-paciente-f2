@@ -36,7 +36,7 @@ export async function createClinic(data: FormData) {
     return created
   })
   refresh()
-  return clinic.id
+  void clinic.id
 }
 export async function updateClinic(data: FormData) {
   const actorId = await requireAdmin()
