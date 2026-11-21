@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getValidatedSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import ActivitySearch from "./ActivitySearch"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export const dynamic = "force-dynamic"
 
@@ -21,7 +22,7 @@ export default async function ReportsPage() {
     redirect("/dashboard")
   }
 
-  const patients = await prisma.doctorPatient.findMany({
+  const legacyPatients = await prisma.doctorPatient.findMany({
     where: {
       doctorId: doctor.id
     },
@@ -29,6 +30,16 @@ export default async function ReportsPage() {
       patient: true
     }
   })
+
+  const patients = (await Promise.all(legacyPatients.map(async p => {
+    try {
+      await requireAuditedDoctorAccessForActor({ actorId: doctor.id, patientId: p.patientId, operation: 'READ_RECORD' })
+      return p
+    } catch (error) {
+      if (error instanceof MedicalAccessDeniedError) return null
+      throw error
+    }
+  }))).filter((p): p is NonNullable<typeof p> => p !== null)
 
   const patientIds = patients.map(p => p.patientId)
 
