@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import PatientsSearch from './PatientsSearch'
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 export default async function PatientsPage() {
 
@@ -12,6 +13,8 @@ export default async function PatientsPage() {
   }
 
   const doctorId = session.userId
+  const actor = await prisma.user.findUnique({ where: { id: doctorId }, select: { active: true, role: true } })
+  if (!actor?.active || actor.role !== 'DOCTOR') redirect('/dashboard')
 
   const patientsData = await prisma.doctorPatient.findMany({
     where: {
@@ -31,8 +34,14 @@ export default async function PatientsPage() {
     }
   })
 
-  const patients = await Promise.all(
+  const patients = (await Promise.all(
     patientsData.map(async (p) => {
+      try {
+        await requireAuditedDoctorAccessForActor({ actorId: doctorId, patientId: p.patient.id, operation: 'READ_RECORD' })
+      } catch (error) {
+        if (error instanceof MedicalAccessDeniedError) return null
+        throw error
+      }
 
       const docs = p.patient.documents
 
@@ -122,7 +131,7 @@ export default async function PatientsPage() {
           : null
       }
     })
-  )
+  )).filter((p): p is NonNullable<typeof p> => p !== null)
 
   return (
 

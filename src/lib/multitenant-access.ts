@@ -32,7 +32,7 @@ async function authorizeMedicalRecordAccess(args: {
   validatedActorId?: string
 }): Promise<AccessDecision> {
   const { organizationId, patientId, operation } = args
-  const session = await getValidatedSession()
+  const session = args.validatedActorId ? null : await getValidatedSession()
   const actorId = args.validatedActorId ?? session?.userId ?? null
   const deny = (reason: string): AccessDecision => ({
     allowed: false, reason, actorId, organizationId, patientId,
