@@ -31,3 +31,6 @@ El directorio `prisma/migrations` comienza con cambios incrementales, no con la 
 - ADMIN inicia sesión sin restablecer contraseña.
 - Pruebas con datos sintéticos de consentimiento, acceso médico, cambio de categoría, reflejo en paciente y auditoría.
 - Dominios y TLS verificados; ninguna carga de pacientes reales antes de aprobación de seguridad.
+
+## Generación segura del baseline (agregado 2026-11-21)
+En la rama `chore/v2-production-readiness`, ejecutar `npm ci` y luego `bash scripts/generate-v2-baseline.sh`. El script valida Prisma y genera SQL **solo en archivo local** (`.v2-baseline-review/initial-schema.sql`), usando `--from-empty`; no abre conexiones ni modifica bases existentes. Revisar SQL y ensayar en base desechable antes de aprobar una migración inicial. **No ejecutar** `prisma migrate deploy` contra V2 hasta reconciliar el historial incremental. El script no migra administradores ni copia datos.
