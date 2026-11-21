@@ -1,4 +1,4 @@
-import { getAuthorizedMinorProxy } from '@/lib/guardian-proxy-access'
+import { getAuthorizedProxy } from '@/lib/guardian-proxy-access'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { s3 } from "@/lib/s3"
@@ -78,7 +78,7 @@ export default async function handler(
 
     if (!isOwner) {
       if (actor.role === 'PATIENT') {
-        const proxy = document.proxyVisible ? await getAuthorizedMinorProxy(userId, document.userId) : null
+        const proxy = document.proxyVisible ? await getAuthorizedProxy(userId, document.userId) : null
         if (!proxy) return res.status(404).json({ error: "Documento no encontrado" })
         await prisma.auditLog.create({ data: {
           userId, action: 'GUARDIAN_DOCUMENT_VIEW', entityId: document.id,
