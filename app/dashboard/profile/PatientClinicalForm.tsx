@@ -11,6 +11,8 @@ export default function PatientClinicalForm({ initialData }: any) {
     dateOfBirth: initialData?.dateOfBirth || "",
     bloodType: initialData?.bloodType || "",
     allergies: initialData?.allergies || "",
+    medicalConditions: initialData?.medicalConditions || "",
+    surgeries: initialData?.surgeries || "",
   })
 
   async function handleSubmit(e: any) {
@@ -102,6 +104,14 @@ export default function PatientClinicalForm({ initialData }: any) {
           />
         </div>
 
+        <div>
+          <label htmlFor="medicalConditions" className="font-semibold">Condiciones y padecimientos</label>
+          <textarea id="medicalConditions" maxLength={10000} rows={4} placeholder="Describa sus condiciones y padecimientos (opcional)" value={form.medicalConditions} onChange={(e) => setForm({ ...form, medicalConditions: e.target.value })} className="w-full border p-3 rounded-lg" />
+        </div>
+        <div>
+          <label htmlFor="surgeries" className="font-semibold">Cirugías</label>
+          <textarea id="surgeries" maxLength={10000} rows={4} placeholder="Describa las cirugías realizadas, fechas u observaciones (opcional)" value={form.surgeries} onChange={(e) => setForm({ ...form, surgeries: e.target.value })} className="w-full border p-3 rounded-lg" />
+        </div>
         <button
           type="submit"
           disabled={loading}

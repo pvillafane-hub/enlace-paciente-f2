@@ -27,6 +27,8 @@ export default async function ProfilePage() {
           dateOfBirth: user.dateOfBirth?.toISOString().split("T")[0] || "",
           bloodType: user.bloodType || "",
           allergies: user.allergies || "",
+          medicalConditions: user.medicalConditions || "",
+          surgeries: user.surgeries || "",
         }}
       />
     </div>

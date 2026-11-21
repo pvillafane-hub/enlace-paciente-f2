@@ -40,6 +40,8 @@ model User {
   dateOfBirth DateTime?
   bloodType   String?
   allergies   String?
+  medicalConditions String? @db.Text
+  surgeries String? @db.Text
   contactPhone String?
   identityStatus String @default("CLEAR")
 

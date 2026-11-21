@@ -25,7 +25,12 @@ export async function POST(req: Request) {
     const userId = session.userId
 
     const body = await req.json()
-    const { dateOfBirth, bloodType, allergies } = body
+    const { dateOfBirth, bloodType, allergies, medicalConditions, surgeries } = body
+    if ([medicalConditions, surgeries].some(value => typeof value !== 'string' || value.length > 10000)) {
+      return NextResponse.json({ error: 'Información médica inválida' }, { status: 400 })
+    }
+    const account = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, active: true } })
+    if (!account?.active || account.role !== 'PATIENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     await prisma.user.update({
       where: { id: userId },
@@ -33,6 +38,8 @@ export async function POST(req: Request) {
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         bloodType: bloodType || null,
         allergies: allergies || null,
+        medicalConditions: medicalConditions.trim() || null,
+        surgeries: surgeries.trim() || null,
       },
     })
 
