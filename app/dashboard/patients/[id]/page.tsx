@@ -311,6 +311,7 @@ export default async function PatientPage({
         <h2 className="text-xl font-semibold mb-6">Historial médico</h2>
 
         <DocumentSearch
+          allowCategoryEdit={isDoctor && !isDemo}
           documents={patient.documents.map((doc: any) => ({
             ...doc,
             studyDate:

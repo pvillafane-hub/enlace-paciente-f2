@@ -1,8 +1,27 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function DocumentSearch({ documents }: any) {
+export default function DocumentSearch({ documents, allowCategoryEdit = false }: { documents: any[], allowCategoryEdit?: boolean }) {
+  const router = useRouter()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [category, setCategory] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const categories = ['Laboratorio', 'Radiografía', 'Resonancia magnética', 'Tomografía', 'Ultrasonido', 'Mamografía', 'Electrocardiograma', 'Receta', 'Medicamentos', 'Informe médico', 'Patología', 'Vacunas', 'Otros']
+  async function saveCategory(documentId: string) {
+    setSaving(true)
+    setMessage('')
+    try {
+      const response = await fetch('/api/multitenant/doctor/document-category', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ documentId, category }) })
+      if (!response.ok) { setMessage(response.status === 404 ? 'No tiene permiso para cambiar esta categoría.' : 'No se pudo guardar. Actualice la página e intente de nuevo.'); return }
+      setEditingId(null)
+      setMessage('Categoría actualizada correctamente.')
+      router.refresh()
+    } catch { setMessage('Error de conexión al guardar.') } finally { setSaving(false) }
+  }
+
 
   const [query, setQuery] = useState("")
 
@@ -49,6 +68,8 @@ export default function DocumentSearch({ documents }: any) {
         onChange={(e) => setQuery(e.target.value)}
         className="w-full border rounded-lg px-4 py-3 text-lg"
       />
+
+      {message && <p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
 
       {/* RESULTADOS */}
 
@@ -124,6 +145,17 @@ export default function DocumentSearch({ documents }: any) {
 
               </div>
 
+              <div className="flex flex-col gap-2 items-end">
+              {allowCategoryEdit && !isDemoDoc && (
+                editingId === doc.id ? <div className="flex flex-col gap-2">
+                  <label htmlFor={'category-' + doc.id} className="text-sm font-semibold">Categoría del estudio</label>
+                  <select id={'category-' + doc.id} value={category} onChange={e => setCategory(e.target.value)} className="rounded border p-2">
+                    {[...new Set([doc.docType, ...categories])].map(value => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                  <button type="button" disabled={saving} onClick={() => saveCategory(doc.id)} className="rounded bg-green-700 px-3 py-2 text-white disabled:opacity-50">Guardar</button>
+                  <button type="button" disabled={saving} onClick={() => setEditingId(null)} className="rounded border px-3 py-2">Cancelar</button>
+                </div> : <button type="button" onClick={() => { setEditingId(doc.id); setCategory(doc.docType); setMessage('') }} className="rounded border border-blue-600 px-3 py-2 text-blue-700">Editar categoría</button>
+              )}
               <a
                 href={href}
                 target="_blank"
@@ -132,6 +164,7 @@ export default function DocumentSearch({ documents }: any) {
               >
                 Ver
               </a>
+              </div>
 
             </div>
 
