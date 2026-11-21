@@ -43,6 +43,12 @@ jobs:
         run: npx prisma validate
       - name: Generate complete baseline from empty
         run: npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/v2-baseline.sql
+      - name: Export reviewed baseline as base64 in CI log
+        run: |
+          echo V2_BASELINE_BEGIN
+          base64 -w0 /tmp/v2-baseline.sql
+          echo
+          echo V2_BASELINE_END
       - name: Apply baseline to empty PostgreSQL
         run: npx prisma db execute --file /tmp/v2-baseline.sql --schema prisma/schema.prisma
       - name: Apply original database CHECK constraints
