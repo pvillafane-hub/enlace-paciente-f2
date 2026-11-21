@@ -1,3 +1,4 @@
+import { getAuthorizedMinorProxy } from '@/lib/guardian-proxy-access'
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "@/lib/prisma"
 import { s3 } from "@/lib/s3"
@@ -76,15 +77,23 @@ export default async function handler(
     const isOwner = document.userId === userId
 
     if (!isOwner) {
-      if (actor.role !== 'DOCTOR') return res.status(404).json({ error: "Documento no encontrado" })
-      try {
-        await requireAuditedDoctorAccessForActor({
-          actorId: userId, patientId: document.userId, operation: 'READ_RECORD', resourceId: document.id,
-        })
-      } catch (error) {
-        if (error instanceof MedicalAccessDeniedError) return res.status(404).json({ error: "Documento no encontrado" })
-        throw error
-      }
+      if (actor.role === 'PATIENT') {
+        const proxy = document.proxyVisible ? await getAuthorizedMinorProxy(userId, document.userId) : null
+        if (!proxy) return res.status(404).json({ error: "Documento no encontrado" })
+        await prisma.auditLog.create({ data: {
+          userId, action: 'GUARDIAN_DOCUMENT_VIEW', entityId: document.id,
+          metadata: { patientId: document.userId, guardianLinkId: proxy.id },
+        } })
+      } else if (actor.role === 'DOCTOR') {
+        try {
+          await requireAuditedDoctorAccessForActor({
+            actorId: userId, patientId: document.userId, operation: 'READ_RECORD', resourceId: document.id,
+          })
+        } catch (error) {
+          if (error instanceof MedicalAccessDeniedError) return res.status(404).json({ error: "Documento no encontrado" })
+          throw error
+        }
+      } else return res.status(404).json({ error: "Documento no encontrado" })
     }
 
     // ☁️ GENERAR SIGNED URL
