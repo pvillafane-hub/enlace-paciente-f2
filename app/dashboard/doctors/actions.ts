@@ -15,6 +15,8 @@ export async function revokeAccess(formData: FormData) {
     throw new Error("Unauthorized")
   }
 
+  const patient = await prisma.user.findUnique({ where: { id: session.userId }, select: { active: true, role: true } })
+  if (!patient?.active || patient.role !== 'PATIENT') throw new Error('Forbidden')
   const doctorId = String(formData.get("doctorId"))
 
   if (!doctorId) {
@@ -56,6 +58,8 @@ export async function inviteDoctor(formData: FormData) {
     .toLowerCase()
     .trim()
 
+  const patient = await prisma.user.findUnique({ where: { id: session.userId }, select: { active: true, role: true } })
+  if (!patient?.active || patient.role !== 'PATIENT') throw new Error('Forbidden')
   if (!email) {
     throw new Error("Email requerido")
   }

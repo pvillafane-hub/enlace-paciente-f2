@@ -169,7 +169,7 @@ export default async function PatientPage({
       documents: realPatient.documents.map(doc => ({
         ...doc,
         studyDate: new Date(doc.studyDate),
-        deletedAt: null
+        deletedAt: doc.deletedAt
       }))
     }
   }

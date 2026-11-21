@@ -95,12 +95,12 @@ export default async function DoctorsPage() {
         {/* DOCTORES CON ACCESO */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
-            Doctores con acceso
+            Relaciones médicas anteriores
           </h2>
 
           {doctors.length === 0 && (
             <p className="text-gray-500">
-              No tienes doctores con acceso todavía.
+              No hay relaciones anteriores registradas.
             </p>
           )}
 
@@ -125,7 +125,7 @@ export default async function DoctorsPage() {
                   <form action={revokeAccess}>
                     <input type="hidden" name="doctorId" value={d.doctor.id} />
                     <button className="text-red-600 text-sm">
-                      Revocar acceso
+                      Eliminar relación anterior
                     </button>
                   </form>
                 </div>
