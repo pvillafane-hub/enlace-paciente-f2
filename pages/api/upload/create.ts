@@ -4,6 +4,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'fs'
 import { prisma } from '@/lib/prisma'
 import { parse } from "cookie"
+import { requireAuditedDoctorAccessForActor, MedicalAccessDeniedError } from "@/lib/multitenant-access"
 
 export const config = {
   api: {
@@ -47,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       })
 
-      if (!session?.userId || !session.user) {
+      if (!session?.userId || !session.user || session.expiresAt < new Date() || !session.user.active || (session.user.passwordChangedAt && session.createdAt < session.user.passwordChangedAt)) {
         return res.status(401).json({ error: "No autorizado" })
       }
 
@@ -81,36 +82,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
         }
 
-        let doctorId = currentUser.id
-
-        if (isStaff) {
-          const staffRelation = await prisma.clinicStaff.findFirst({
-            where: {
-              staffId: currentUser.id,
-              active: true,
-            },
+        // V1: only explicitly authorized doctors may upload on behalf of a patient.
+        // Staff delegation requires a separate audited policy; deny by default.
+        if (isStaff) return res.status(403).json({ error: "Permiso clínico no disponible" })
+        try {
+          await requireAuditedDoctorAccessForActor({
+            actorId: currentUser.id, patientId, operation: 'UPLOAD_DOCUMENT',
           })
-
-          if (!staffRelation) {
-            return res.status(403).json({
-              error: "Este staff no está asignado a un doctor activo",
-            })
-          }
-
-          doctorId = staffRelation.doctorId
-        }
-
-        const access = await prisma.doctorPatient.findFirst({
-          where: {
-            doctorId,
-            patientId,
-          },
-        })
-
-        if (!access) {
-          return res.status(403).json({
-            error: "No autorizado para subir documentos a este paciente",
-          })
+        } catch (error) {
+          if (error instanceof MedicalAccessDeniedError) return res.status(403).json({ error: "No autorizado para subir documentos a este paciente" })
+          throw error
         }
 
         const patient = await prisma.user.findUnique({

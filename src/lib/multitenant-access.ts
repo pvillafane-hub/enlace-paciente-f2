@@ -29,10 +29,11 @@ async function authorizeMedicalRecordAccess(args: {
   organizationId: string
   patientId: string
   operation: RecordOperation
+  validatedActorId?: string
 }): Promise<AccessDecision> {
   const { organizationId, patientId, operation } = args
   const session = await getValidatedSession()
-  const actorId = session?.userId ?? null
+  const actorId = args.validatedActorId ?? session?.userId ?? null
   const deny = (reason: string): AccessDecision => ({
     allowed: false, reason, actorId, organizationId, patientId,
   })
@@ -147,4 +148,49 @@ export async function requireAuditedMedicalRecordAccess(args: {
   await recordMedicalAccessDecision(decision, args.operation, args.resourceId)
   if (!decision.allowed) throw new MedicalAccessDeniedError(decision.reason)
   return decision
+}
+
+/**
+ * For legacy Pages API handlers only. Caller MUST validate pp_session against
+ * prisma.session, expiry and passwordChangedAt before passing actorId.
+ * The doctor is never selected from a request parameter.
+ */
+export async function requireAuditedMedicalRecordAccessForActor(args: {
+  actorId: string
+  organizationId: string
+  patientId: string
+  operation: RecordOperation
+  resourceId?: string
+}): Promise<AccessDecision> {
+  const decision = await authorizeMedicalRecordAccess({
+    organizationId: args.organizationId,
+    patientId: args.patientId,
+    operation: args.operation,
+    validatedActorId: args.actorId,
+  })
+  await recordMedicalAccessDecision(decision, args.operation, args.resourceId)
+  if (!decision.allowed) throw new MedicalAccessDeniedError(decision.reason)
+  return decision
+}
+
+/** Finds a clinic context for a doctor; no consent is inferred from membership. */
+export async function requireAuditedDoctorAccessForActor(args: {
+  actorId: string
+  patientId: string
+  operation: RecordOperation
+  resourceId?: string
+}): Promise<AccessDecision> {
+  const memberships = await prisma.organizationMember.findMany({
+    where: { userId: args.actorId, role: 'DOCTOR', active: true, organization: { status: 'ACTIVE' } },
+    select: { organizationId: true },
+  })
+  // Each possible clinic context must independently pass the patient grant check.
+  for (const membership of memberships) {
+    try {
+      return await requireAuditedMedicalRecordAccessForActor({ ...args, organizationId: membership.organizationId })
+    } catch (error) {
+      if (!(error instanceof MedicalAccessDeniedError)) throw error
+    }
+  }
+  throw new MedicalAccessDeniedError('NO_VALID_CLINIC_GRANT')
 }

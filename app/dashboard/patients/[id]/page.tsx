@@ -3,6 +3,7 @@ import DocumentSearch from '@/components/DocumentSearch'
 import { prisma } from '@/lib/prisma'
 import { getValidatedSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { requireAuditedMedicalRecordAccessForActor, MedicalAccessDeniedError } from '@/lib/multitenant-access'
 
 export default async function PatientPage({
   params,
@@ -56,24 +57,28 @@ export default async function PatientPage({
   }
 
   if (!isDemo) {
-    const access = await prisma.doctorPatient.findFirst({
-      where: { doctorId, patientId }
+    // Multi-Tenant V1: legacy DoctorPatient and ClinicStaff records are not consent.
+    if (isStaff) redirect('/dashboard')
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId: user.id, active: true, role: 'DOCTOR', organization: { status: 'ACTIVE' } },
+      select: { organizationId: true },
     })
-
-    if (!access) {
-      redirect('/dashboard')
-    }
-
-    await prisma.medicalAlert.updateMany({
-      where: {
-        doctorId,
-        patientId,
-        resolved: false
-      },
-      data: {
-        resolved: true,
-        resolvedAt: new Date()
+    let authorized = false
+    for (const member of memberships) {
+      try {
+        await requireAuditedMedicalRecordAccessForActor({
+          actorId: user.id, organizationId: member.organizationId, patientId, operation: 'READ_RECORD',
+        })
+        authorized = true
+        break
+      } catch (error) {
+        if (!(error instanceof MedicalAccessDeniedError)) throw error
       }
+    }
+    if (!authorized) redirect('/dashboard')
+    await prisma.medicalAlert.updateMany({
+      where: { doctorId, patientId, resolved: false },
+      data: { resolved: true, resolvedAt: new Date() },
     })
   }
 
