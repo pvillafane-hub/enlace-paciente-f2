@@ -1,0 +1,75 @@
+name: V2 database bootstrap validation
+on:
+  push:
+    branches:
+      - chore/v2-production-database-bootstrap
+  pull_request:
+    paths:
+      - prisma/**
+      - ops/db/**
+      - .github/workflows/v2-db-bootstrap-validation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: enlace_v2_synthetic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d enlace_v2_synthetic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/enlace_v2_synthetic?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate complete baseline from empty
+        run: npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/v2-baseline.sql
+      - name: Apply baseline to empty PostgreSQL
+        run: npx prisma db execute --file /tmp/v2-baseline.sql --schema prisma/schema.prisma
+      - name: Apply original database CHECK constraints
+        run: npx prisma db execute --file ops/db/v2-security-constraints.sql --schema prisma/schema.prisma
+      - name: Verify essential tables and security constraints
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          sql = """DO $$ BEGIN
+            IF (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('User','Document','Organization','GuardianLink','MedicalAccessGrant','InteropSandboxReceipt')) <> 6 THEN
+              RAISE EXCEPTION 'Missing essential application tables';
+            END IF;
+            IF (SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace AND conname IN (
+              'GuardianLink_active_verified','GuardianLink_distinct_people','GuardianLink_relationship_check','GuardianLink_status_check',
+              'MedicalAccessRequest_initiatedBy_check','User_identityStatus_check',
+              'InteropIntegrationDraft_auth_check','InteropIntegrationDraft_direction_check',
+              'InteropIntegrationDraft_protocol_check','InteropIntegrationDraft_status_check'
+            )) <> 10 THEN RAISE EXCEPTION 'Missing custom security constraints'; END IF;
+          END $$;"""
+          open('/tmp/v2-verify.sql','w').write(sql)
+          subprocess.run(['npx','prisma','db','execute','--file','/tmp/v2-verify.sql','--schema','prisma/schema.prisma'],check=True)
+          PY
+      - name: Confirm no real patient data
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          sql='DO $$ BEGIN IF (SELECT count(*) FROM "User") <> 0 THEN RAISE EXCEPTION \'Unexpected user records\'; END IF; END $$;'
+          open('/tmp/v2-empty.sql','w').write(sql)
+          subprocess.run(['npx','prisma','db','execute','--file','/tmp/v2-empty.sql','--schema','prisma/schema.prisma'],check=True)
+          PY
