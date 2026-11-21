@@ -21,15 +21,14 @@ export default async function ClinicPage() {
   const actor = await prisma.user.findUnique({ where: { id: doctorId }, select: { active: true, role: true } })
   if (!actor?.active || actor.role !== 'DOCTOR') redirect('/dashboard')
 
-  const legacyPatients = await prisma.doctorPatient.findMany({
-    where: { doctorId },
-    include: {
-      patient: true
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
+  const grants = await prisma.medicalAccessGrant.findMany({
+    where: { doctorId, status: 'ACTIVE', revokedAt: null, OR: [{ validUntil: null }, { validUntil: { gt: new Date() } }], organization: { status: 'ACTIVE' }, patient: { active: true } },
+    select: { patientId: true },
+    distinct: ['patientId'],
   })
+  const legacyPatients = (await prisma.user.findMany({
+    where: { id: { in: grants.map(g => g.patientId) }, role: 'PATIENT', active: true },
+  })).map(patient => ({ id: patient.id, patientId: patient.id, patient }))
 
   const patients = (await Promise.all(legacyPatients.map(async p => {
     try {

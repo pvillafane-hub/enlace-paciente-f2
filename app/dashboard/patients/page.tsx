@@ -16,34 +16,26 @@ export default async function PatientsPage() {
   const actor = await prisma.user.findUnique({ where: { id: doctorId }, select: { active: true, role: true } })
   if (!actor?.active || actor.role !== 'DOCTOR') redirect('/dashboard')
 
-  const patientsData = await prisma.doctorPatient.findMany({
-    where: {
-      doctorId
-    },
-    include: {
-      patient: {
-        include: {
-          documents: {
-            orderBy: {
-              createdAt: 'desc'
-            },
-            take: 5
-          }
-        }
-      }
-    }
+  const grants = await prisma.medicalAccessGrant.findMany({
+    where: { doctorId, status: 'ACTIVE', revokedAt: null, OR: [{ validUntil: null }, { validUntil: { gt: new Date() } }], organization: { status: 'ACTIVE' }, patient: { active: true } },
+    select: { patientId: true },
+    distinct: ['patientId'],
+  })
+  const patientsData = await prisma.user.findMany({
+    where: { id: { in: grants.map(g => g.patientId) }, role: 'PATIENT', active: true },
+    include: { documents: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 5 } },
   })
 
   const patients = (await Promise.all(
     patientsData.map(async (p) => {
       try {
-        await requireAuditedDoctorAccessForActor({ actorId: doctorId, patientId: p.patient.id, operation: 'READ_RECORD' })
+        await requireAuditedDoctorAccessForActor({ actorId: doctorId, patientId: p.id, operation: 'READ_RECORD' })
       } catch (error) {
         if (error instanceof MedicalAccessDeniedError) return null
         throw error
       }
 
-      const docs = p.patient.documents
+      const docs = p.documents
 
       const now = Date.now()
       const last7Days = now - 7 * 24 * 60 * 60 * 1000
@@ -78,7 +70,7 @@ export default async function PatientsPage() {
         const existingAlert = await prisma.auditLog.findFirst({
           where: {
             action: "HIGH_RISK_PATIENT",
-            userId: p.patient.id,
+            userId: p.id,
             createdAt: {
               gte: new Date(Date.now() - 60 * 60 * 1000)
             }
@@ -89,7 +81,7 @@ export default async function PatientsPage() {
           await prisma.auditLog.create({
             data: {
               action: "HIGH_RISK_PATIENT",
-              userId: p.patient.id,
+              userId: p.id,
               metadata: {
                 score,
                 reason: "High activity in short period"
@@ -112,9 +104,9 @@ export default async function PatientsPage() {
       }
 
       return {
-        id: p.patient.id,
-        fullName: p.patient.fullName,
-        email: p.patient.email,
+        id: p.id,
+        fullName: p.fullName,
+        email: p.email,
 
         // 👇 esto lo usará el frontend
         riskScore: score,
