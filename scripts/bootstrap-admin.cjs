@@ -1,40 +1,54 @@
 'use strict'
-// Explicit, idempotent bootstrap for an EMPTY or newly provisioned database.
-// Usage: ADMIN_BOOTSTRAP_EMAIL=... ADMIN_BOOTSTRAP_PASSWORD=... node scripts/bootstrap-admin.cjs
-// Never print the password or the database URL.
-const { PrismaClient } = require('@prisma/client')
+// One-time, operator-run bootstrap. NEVER expose this script through an HTTP route.
+// Run only after verifying the target DATABASE_URL points to the intended EMPTY V2 database.
+// Environment variables: ADMIN_BOOTSTRAP_CONFIRM=CREATE_INITIAL_ADMIN,
+// ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD, DATABASE_URL.
+// Do not store credentials in Git, build logs, Vercel environment variables, or shell history.
+const { PrismaClient, Prisma } = require('@prisma/client')
 const bcrypt = require('bcrypt')
 const prisma = new PrismaClient()
 
 async function main() {
+  if (process.env.ADMIN_BOOTSTRAP_CONFIRM !== 'CREATE_INITIAL_ADMIN') {
+    throw new Error('Bootstrap not confirmed; no changes made')
+  }
+  const url = process.env.DATABASE_URL || ''
+  if (!/^postgres(ql)?:\/\//.test(url)) throw new Error('DATABASE_URL must be a PostgreSQL connection')
   const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || '').trim().toLowerCase()
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD || ''
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 16) {
-    throw new Error('Set a valid ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD (at least 16 characters)')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 16 ||
+      !/[A-Z]/.test(password) || !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    throw new Error('Valid admin email and strong password (16+ chars, upper/lower/digit/symbol) required')
   }
-  const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) {
-    if (existing.role !== 'ADMIN' || !existing.active) {
-      throw new Error('Bootstrap email belongs to a non-admin or inactive account; manual review required')
-    }
-    console.log('Admin account already exists and is active; no changes made')
-    return
-  }
+
+  // Hash before transaction; never log the password, hash or connection string.
   const passwordHash = await bcrypt.hash(password, 12)
-  try {
-    await prisma.user.create({
-      data: { email, passwordHash, fullName: 'Administrador Enlace Salud', role: 'ADMIN', active: true },
+  await prisma.$transaction(async (tx) => {
+    const count = await tx.user.count()
+    if (count !== 0) throw new Error('Database already has users; bootstrap refused')
+    const user = await tx.user.create({
+      data: {
+        email, passwordHash, fullName: 'Administrador Enlace Salud',
+        role: 'ADMIN', active: true,
+      },
     })
-    console.log('Initial administrator account created')
-  } catch (error) {
-    if (error.code === 'P2002') {
-      const admin = await prisma.user.findUnique({ where: { email } })
-      if (admin?.role === 'ADMIN' && admin.active) {
-        console.log('Admin account already exists; no changes made')
-        return
-      }
-    }
-    throw error
-  }
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'INITIAL_ADMIN_BOOTSTRAP',
+        entityId: user.id,
+        metadata: { source: 'operator_cli', version: 1 },
+      },
+    })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  console.log('Initial admin created and audit event recorded')
 }
-main().catch(err => { console.error(err.message); process.exitCode = 1 }).finally(() => prisma.$disconnect())
+
+main()
+  .catch((error) => {
+    // Avoid printing raw Prisma errors, which can include connection details.
+    console.error('Bootstrap refused or failed:', error.code || error.message?.split('\n')[0] || 'unknown error')
+    process.exitCode = 1
+  })
+  .finally(async () => { await prisma.$disconnect() })
